@@ -14,6 +14,7 @@ DB_NAME="wp$(date +%s)"
 DB_USER="$DB_NAME"
 DB_PASS=$(openssl rand -base64 12)
 MYSQL_ROOT_PASS=$(openssl rand -base64 12)
+SERVER_NAME="new.derp.lol"
 
 # Update system
 apt update && apt upgrade -y
@@ -87,7 +88,7 @@ echo 'server {
    root /var/www/html;
    index index.php index.html index.htm;
    
-   server_name _;
+   server_name $SERVER_NAME;
    
    # Massive file upload support
    client_max_body_size 2G;
