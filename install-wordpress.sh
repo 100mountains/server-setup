@@ -180,6 +180,9 @@ fi
 # Test nginx config and restart services
 nginx -t && systemctl restart nginx php8.3-fpm
 
+# Install Certbot from Nginx config
+certbot --nginx --non-interactive --agree-tos 
+
 # Install WP-CLI for easier management
 curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
 chmod +x wp-cli.phar
