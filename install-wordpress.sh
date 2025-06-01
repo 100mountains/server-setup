@@ -2,9 +2,9 @@
 # WordPress NGINX installation script for Ubuntu 24.04 - Audio/Large File Version
 #
 
-# Load environment variables from .env file
+# Load environment variables from .env file, excluding comments
 if [ -f .env ]; then
-  export $(cat .env | xargs)
+  export $(grep -v '^#' .env | xargs)
 fi
 
 # Check if running as root
