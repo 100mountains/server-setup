@@ -50,7 +50,7 @@ if sshd -t; then
 else
     echo "ERROR: SSH config test failed! Restoring backup..."
     cp "$BACKUP_DIR/sshd_config.backup" /etc/ssh/sshd_config
-    systemctl restart sshd
+    systemctl restart ssh
     echo "SSH config restored from backup"
     exit 1
 fi
