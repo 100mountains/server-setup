@@ -24,7 +24,7 @@ MYSQL_ROOT_PASS=$(openssl rand -base64 12)
 apt update && apt upgrade -y
 
 # Install LEMP stack with all PHP extensions
-apt install -y nginx certbot python3-certbot-nginx mariadb-server php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath
+apt install -y nginx certbot sshfs python3-certbot-nginx mariadb-server php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath
 
 # Start and enable services
 systemctl enable nginx mariadb php8.3-fpm
