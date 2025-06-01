@@ -164,7 +164,7 @@ echo "server {
        expires max;
        log_not_found off;
    }
-}"  | envsubst '$SERVER_NAME' > /etc/nginx/sites-available/default
+}"  | envsubst '$DOMAIN_NAME' > /etc/nginx/sites-available/default
 
 # Increase Nginx main configuration limits
 sed -i 's/# server_names_hash_bucket_size/server_names_hash_bucket_size/' /etc/nginx/nginx.conf
