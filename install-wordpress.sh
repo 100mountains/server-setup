@@ -1,5 +1,11 @@
 #!/bin/bash
 # WordPress NGINX installation script for Ubuntu 24.04 - Audio/Large File Version
+#
+
+# Load environment variables from .env file
+if [ -f .env ]; then
+  export $(cat .env | xargs)
+fi
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -14,7 +20,6 @@ DB_NAME="wp$(date +%s)"
 DB_USER="$DB_NAME"
 DB_PASS=$(openssl rand -base64 12)
 MYSQL_ROOT_PASS=$(openssl rand -base64 12)
-SERVER_NAME="new.derp.lol"
 
 # Update system
 apt update && apt upgrade -y
@@ -31,6 +36,11 @@ mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY
 mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.user WHERE User='';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DROP DATABASE IF EXISTS test;"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
+
+# MariaDB hardening (non-interactive)
+mysql -u root -p$MYSQL_ROOT_PASS -e "UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';"
+mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='information_schema' OR Db='performance_schema';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
 
 # Create WordPress database and user
@@ -81,14 +91,14 @@ pm.max_spare_servers = 40
 pm.max_requests = 1000' >> /etc/php/8.3/fpm/pool.d/www.conf
 
 # Configure Nginx for WordPress with audio streaming optimizations
-echo 'server {
+echo "server {
    listen 80 default_server;
    listen [::]:80 default_server;
    
    root /var/www/html;
    index index.php index.html index.htm;
    
-   server_name $SERVER_NAME;
+   server_name $DOMAIN_NAME;
    
    # Massive file upload support
    client_max_body_size 2G;
@@ -154,7 +164,7 @@ echo 'server {
        expires max;
        log_not_found off;
    }
-}' > /etc/nginx/sites-available/default
+}"  | envsubst '$SERVER_NAME' > /etc/nginx/sites-available/default
 
 # Increase Nginx main configuration limits
 sed -i 's/# server_names_hash_bucket_size/server_names_hash_bucket_size/' /etc/nginx/nginx.conf
@@ -182,7 +192,7 @@ fi
 nginx -t && systemctl restart nginx php8.3-fpm
 
 # Install Certbot from Nginx config
-certbot --nginx --non-interactive --agree-tos 
+certbot --nginx --non-interactive --agree-tos -m $EMAIL
 
 # Install WP-CLI for easier management
 curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
