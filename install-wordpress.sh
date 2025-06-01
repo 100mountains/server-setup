@@ -39,7 +39,6 @@ mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
 
 # MariaDB hardening (non-interactive)
 mysql -u root -p$MYSQL_ROOT_PASS -e "UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='information_schema' OR Db='performance_schema';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
 
 # Lockdown MariaDB (MySQL) - No Remote Access
@@ -195,7 +194,7 @@ fi
 nginx -t && systemctl restart nginx php8.3-fpm
 
 # Install Certbot from Nginx config
-certbot --nginx --non-interactive --agree-tos -m $EMAIL
+certbot --nginx --non-interactive --agree-tos -m $EMAIL -d $DOMAIN_NAME
 
 # Install WP-CLI for easier management
 curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
