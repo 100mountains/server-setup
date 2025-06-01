@@ -1,6 +1,5 @@
 #!/bin/bash
 # WordPress NGINX installation script for Ubuntu 24.04 - Audio/Large File Version
-#
 
 # Load environment variables from .env file, excluding comments
 if [ -f .env ]; then
@@ -42,6 +41,10 @@ mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
 mysql -u root -p$MYSQL_ROOT_PASS -e "UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='information_schema' OR Db='performance_schema';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
+
+# Lockdown MariaDB (MySQL) - No Remote Access
+echo "Configuring MariaDB to allow only local connections..."
+sed -i 's/^bind-address.*/bind-address = 127.0.0.1/' /etc/mysql/mariadb.conf.d/50-server.cnf
 
 # Create WordPress database and user
 mysql -u root -p$MYSQL_ROOT_PASS -e "CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
