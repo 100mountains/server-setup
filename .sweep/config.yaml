@@ -1,0 +1,5 @@
+branch: main
+gha_enabled: True
+description: >
+  This repository contains scripts and templates for setting up WordPress servers with NGINX.
+  It includes configuration for handling large audio files, security hardening, and optimized server settings.
