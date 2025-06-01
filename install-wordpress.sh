@@ -17,28 +17,27 @@ echo "Installing WordPress with NGINX on Ubuntu 24.04 (Audio Site Configuration)
 # Generate random credentials
 DB_NAME="wp$(date +%s)"
 DB_USER="$DB_NAME"
-DB_PASS=$(openssl rand -base64 12)
-MYSQL_ROOT_PASS=$(openssl rand -base64 12)
+MYSQL_ROOT_PASS=$(openssl rand -base64 12 | tr -d "=+/")
+DB_PASS=$(openssl rand -base64 12 | tr -d "=+/")
 
 # Update system
 apt update && apt upgrade -y
 
 # Install LEMP stack with all PHP extensions
-apt install -y nginx certbot sshfs python3-certbot-nginx mariadb-server php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath
+apt install -y nginx certbot python3-certbot-nginx mariadb-server php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath
+
+# install optional software
+apt install sshfs
 
 # Start and enable services
 systemctl enable nginx mariadb php8.3-fpm
 systemctl start nginx mariadb php8.3-fpm
 
 # Secure MySQL and set root password
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASS';"
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASS';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.user WHERE User='';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DROP DATABASE IF EXISTS test;"
 mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
-
-# MariaDB hardening (non-interactive)
-mysql -u root -p$MYSQL_ROOT_PASS -e "UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';"
 mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
 
 # Lockdown MariaDB (MySQL) - No Remote Access
@@ -93,7 +92,7 @@ pm.max_spare_servers = 40
 pm.max_requests = 1000' >> /etc/php/8.3/fpm/pool.d/www.conf
 
 # Configure Nginx for WordPress with audio streaming optimizations
-echo "server {
+echo 'server {
    listen 80 default_server;
    listen [::]:80 default_server;
    
@@ -126,7 +125,6 @@ echo "server {
    location ~ \.php$ {
        include snippets/fastcgi-php.conf;
        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
-       fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
        include fastcgi_params;
        fastcgi_buffer_size 128k;
        fastcgi_buffers 256 16k;
@@ -166,7 +164,7 @@ echo "server {
        expires max;
        log_not_found off;
    }
-}"  | envsubst '$DOMAIN_NAME' > /etc/nginx/sites-available/default
+}'  | envsubst '$DOMAIN_NAME' > /etc/nginx/sites-available/default
 
 # Increase Nginx main configuration limits
 sed -i 's/# server_names_hash_bucket_size/server_names_hash_bucket_size/' /etc/nginx/nginx.conf
