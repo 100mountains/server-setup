@@ -28,24 +28,6 @@ server {
        try_files $uri $uri/ /index.php?$args;
    }
    
-   # Deny direct access to audio files in wp-content/uploads
-   location ~* ^/wp-content/uploads/.*\.(mp3|mp4|m4a|flac|wav|ogg|aac|wma|aiff|ape)$ {
-       deny all;
-   }
-   
-   # Internal location for X-Accel-Redirect serving
-   location /protected-woo-files {
-       internal;
-       alias /var/www/html/wp-content/uploads/woocommerce_uploads;
-       add_header Content-Disposition "attachment";
-       add_header X-Content-Type-Options "nosniff";
-   }
-   
-   # Protect WooCommerce uploads folder
-   location ^~ /wp-content/uploads/woocommerce_uploads {
-       deny all;
-   }
-   
    location ~ \.php$ {
        include snippets/fastcgi-php.conf;
        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;

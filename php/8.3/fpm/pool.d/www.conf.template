@@ -1,0 +1,33 @@
+[www]
+user = www-data
+group = www-data
+listen = /run/php/php8.3-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+
+; Process Manager Configuration
+pm = dynamic
+pm.max_children = 200        ; Maximum number of child processes
+pm.start_servers = 40        ; Number of child processes created at startup
+pm.min_spare_servers = 20    ; Minimum number of spare idle processes
+pm.max_spare_servers = 80    ; Maximum number of spare idle processes
+pm.max_requests = 1000       ; Number of requests each child process serves before respawning
+
+; Resource Limits
+pm.process_idle_timeout = 10s
+request_terminate_timeout = 3600
+rlimit_files = 65535
+rlimit_core = unlimited
+
+; PHP Settings
+php_admin_value[memory_limit] = 8G
+php_admin_value[max_execution_time] = 3600
+php_admin_value[max_input_time] = 3600
+php_admin_value[post_max_size] = 2G
+php_admin_value[upload_max_filesize] = 2G
+php_admin_value[max_input_vars] = 10000
+php_admin_value[date.timezone] = UTC
+
+; Error Logging
+php_admin_flag[log_errors] = on
+php_admin_value[error_log] = /var/log/php8.3-fpm.log

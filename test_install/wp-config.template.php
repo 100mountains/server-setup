@@ -9,13 +9,13 @@
 
 // ** Database settings - You can get this info from your web host ** //
 /** The name of the database for WordPress */
-define( 'DB_NAME', '%%DB_NAME%%' );
+define( 'DB_NAME', 'wptest' );
 
 /** Database username */
-define( 'DB_USER', '%%DB_USER%%' );
+define( 'DB_USER', 'wptest' );
 
 /** Database password */
-define( 'DB_PASSWORD', '%%DB_PASSWORD%%' );
+define( 'DB_PASSWORD', 'testpass' );
 
 /** Database hostname */
 define( 'DB_HOST', 'localhost' );
@@ -45,8 +45,8 @@ if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROT
     $_SERVER['HTTPS'] = 'on';
 }
 define('FORCE_SSL_ADMIN', true);
-define('WP_HOME','https://%%DOMAIN_NAME%%');
-define('WP_SITEURL','https://%%DOMAIN_NAME%%');
+define('WP_HOME','https://test.example.com');
+define('WP_SITEURL','https://test.example.com');
 
 // Memory settings optimized for 32GB RAM server
 define('WP_MEMORY_LIMIT', '512M');      // Regular operation limit

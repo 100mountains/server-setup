@@ -5,7 +5,7 @@ server {
    root /var/www/html;
    index index.php index.html index.htm;
    
-   server_name %%DOMAIN_NAME%%;
+   server_name test.example.com;
    
    # Massive file upload support
    client_max_body_size 2G;

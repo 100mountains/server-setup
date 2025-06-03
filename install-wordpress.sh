@@ -1,30 +1,53 @@
 #!/bin/bash
-# WordPress NGINX installation script for Ubuntu 24.04 - Audio/Large File Version
+# WordPress NGINX installation script for Ubuntu 24.04 - High Performance 32GB RAM Version
+
+# Exit on any error
+set -e
+
+# Function for error handling
+handle_error() {
+    echo "Error: $1"
+    exit 1
+}
+
+# Function to verify directory and file existence
+verify_files() {
+    local required_files=(
+        "nginx-wordpress.template"
+        "wp-config.template.php"
+        "mariadb/conf.d/60-optimizations.cnf"
+        "php/8.3/fpm/php.ini.template"
+        "php/8.3/fpm/pool.d/www.conf.template"
+    )
+
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            handle_error "Missing required file: $file"
+        fi
+    done
+}
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
-   echo "Please run as root (use sudo)"
-   exit 1
+    handle_error "Please run as root (use sudo)"
 fi
 
-# Check if we're in the right directory with our templates
-if [ ! -f "nginx-wordpress.template" ] || [ ! -f "wp-config.template.php" ]; then
-    echo "Error: Missing template files. Make sure you're running this from the server-setup directory."
-    exit 1
-fi
+# Verify all required files exist
+verify_files
 
-# Load environment variables from .env file, excluding comments
+# Load environment variables from .env file
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+    export $(grep -v '^#' .env | xargs)
+else
+    handle_error ".env file not found"
 fi
 
 # Check for required env variables
 if [ -z "$DOMAIN_NAME" ] || [ -z "$EMAIL" ]; then
-    echo "Error: DOMAIN_NAME and EMAIL must be set in .env file"
-    exit 1
+    handle_error "DOMAIN_NAME and EMAIL must be set in .env file"
 fi
 
-echo "Installing WordPress with NGINX on Ubuntu 24.04 (Audio Site Configuration)..."
+echo "Installing WordPress with NGINX on Ubuntu 24.04 (32GB RAM High Performance Configuration)..."
 echo "Domain: $DOMAIN_NAME"
 echo "Email: $EMAIL"
 
@@ -35,125 +58,127 @@ MYSQL_ROOT_PASS=$(openssl rand -base64 12 | tr -d "=+/'\"")
 DB_PASS=$(openssl rand -base64 12 | tr -d "=+/'\"")
 
 # Update system
-apt update && apt upgrade -y
+apt update && apt upgrade -y || handle_error "System update failed"
 
-# Install LEMP stack with all PHP extensions
-apt install -y nginx certbot python3-certbot-nginx mariadb-server php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath
-
-# install optional software
-apt install -y sshfs
+# Install LEMP stack with all required extensions
+echo "Installing LEMP stack and required extensions..."
+apt install -y nginx certbot python3-certbot-nginx mariadb-server \
+    php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring \
+    php8.3-xml php8.3-zip php8.3-imagick php8.3-intl php8.3-bcmath \
+    php8.3-opcache sshfs || handle_error "Package installation failed"
 
 # Start and enable services
-systemctl enable nginx mariadb php8.3-fpm
-systemctl start nginx mariadb php8.3-fpm
+echo "Enabling and starting services..."
+systemctl enable nginx mariadb php8.3-fpm || handle_error "Service enablement failed"
+systemctl start nginx mariadb php8.3-fpm || handle_error "Service start failed"
 
-# Secure MySQL and set root password
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASS';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.user WHERE User='';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "DROP DATABASE IF EXISTS test;"
-mysql -u root -p$MYSQL_ROOT_PASS -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
-
-# Lockdown MariaDB (MySQL) - No Remote Access
-echo "Configuring MariaDB to allow only local connections..."
-sed -i 's/^bind-address.*/bind-address = 127.0.0.1/' /etc/mysql/mariadb.conf.d/50-server.cnf
+# Secure MariaDB installation
+echo "Configuring MariaDB..."
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASS';" || handle_error "MariaDB root password setup failed"
+mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF || handle_error "MariaDB secure installation failed"
+DELETE FROM mysql.user WHERE User='';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
 
 # Create WordPress database and user
-mysql -u root -p$MYSQL_ROOT_PASS -e "CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p$MYSQL_ROOT_PASS -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-mysql -u root -p$MYSQL_ROOT_PASS -e "FLUSH PRIVILEGES;"
+echo "Creating WordPress database..."
+mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF || handle_error "WordPress database creation failed"
+CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+EOF
 
-# Download and extract WordPress
-cd /var/www/html
-wget https://wordpress.org/latest.tar.gz
-tar xzf latest.tar.gz
-mv wordpress/* .
+# Configure MariaDB for 32GB RAM server
+echo "Applying MariaDB optimizations..."
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cp "$SCRIPT_DIR/mariadb/conf.d/60-optimizations.cnf" /etc/mysql/mariadb.conf.d/ || handle_error "MariaDB optimization failed"
+systemctl restart mariadb || handle_error "MariaDB restart failed"
+
+# Configure PHP-FPM and PHP.ini
+echo "Configuring PHP..."
+cp "$SCRIPT_DIR/php/8.3/fpm/php.ini.template" /etc/php/8.3/fpm/php.ini || handle_error "PHP.ini configuration failed"
+cp "$SCRIPT_DIR/php/8.3/fpm/pool.d/www.conf.template" /etc/php/8.3/fpm/pool.d/www.conf || handle_error "PHP-FPM configuration failed"
+
+# Verify PHP configurations
+if ! php -v >/dev/null 2>&1; then
+    handle_error "PHP configuration verification failed"
+fi
+
+# Download and install WordPress
+echo "Installing WordPress..."
+cd /var/www/html || handle_error "Cannot access web root"
+wget https://wordpress.org/latest.tar.gz || handle_error "WordPress download failed"
+tar xzf latest.tar.gz || handle_error "WordPress extraction failed"
+mv wordpress/* . || handle_error "WordPress file movement failed"
 mv wordpress/.* . 2>/dev/null || true
 rmdir wordpress
 rm -f latest.tar.gz index.nginx-debian.html
 
-# Get WordPress salts and save to temp file
-echo "Fetching WordPress salts..."
-curl -s https://api.wordpress.org/secret-key/1.1/salt/ > /tmp/wp-salts.txt
+# Configure WordPress
+echo "Configuring WordPress..."
+curl -s https://api.wordpress.org/secret-key/1.1/salt/ > /tmp/wp-salts.txt || handle_error "WordPress salt generation failed"
+cp "$SCRIPT_DIR/wp-config.template.php" wp-config.php || handle_error "wp-config.php creation failed"
 
-# Setup wp-config.php from template
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cp "$SCRIPT_DIR/wp-config.template.php" /var/www/html/wp-config.php
-
-# Replace placeholders in wp-config.php
-sed -i "s/%%DB_NAME%%/$DB_NAME/g" /var/www/html/wp-config.php
-sed -i "s/%%DB_USER%%/$DB_USER/g" /var/www/html/wp-config.php
-sed -i "s/%%DB_PASSWORD%%/$DB_PASS/g" /var/www/html/wp-config.php
-sed -i "s/%%DOMAIN_NAME%%/$DOMAIN_NAME/g" /var/www/html/wp-config.php
-
-# Insert salts (this is the tricky bit - we read them in without fucking up special chars)
-sed -i "/%%SALT_KEYS%%/r /tmp/wp-salts.txt" /var/www/html/wp-config.php
-sed -i "/%%SALT_KEYS%%/d" /var/www/html/wp-config.php
-
-# Clean up
+# Replace configuration placeholders
+sed -i "s/%%DB_NAME%%/$DB_NAME/g" wp-config.php || handle_error "Database name configuration failed"
+sed -i "s/%%DB_USER%%/$DB_USER/g" wp-config.php || handle_error "Database user configuration failed"
+sed -i "s/%%DB_PASSWORD%%/$DB_PASS/g" wp-config.php || handle_error "Database password configuration failed"
+sed -i "s/%%DOMAIN_NAME%%/$DOMAIN_NAME/g" wp-config.php || handle_error "Domain configuration failed"
+sed -i "/%%SALT_KEYS%%/r /tmp/wp-salts.txt" wp-config.php || handle_error "Salt key configuration failed"
+sed -i "/%%SALT_KEYS%%/d" wp-config.php
 rm /tmp/wp-salts.txt
 
 # Set proper permissions
-chown -R www-data:www-data /var/www/html
+echo "Setting file permissions..."
+chown -R www-data:www-data /var/www/html || handle_error "Permission setting failed"
 find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
 chmod 640 /var/www/html/wp-config.php
 
-# Configure PHP for massive file uploads with HIGH MEMORY (32GB server)
-echo "Configuring PHP for large file uploads..."
-sed -i 's/memory_limit = .*/memory_limit = 4G/' /etc/php/8.3/fpm/php.ini
-sed -i 's/upload_max_filesize = .*/upload_max_filesize = 2G/' /etc/php/8.3/fpm/php.ini
-sed -i 's/post_max_size = .*/post_max_size = 2G/' /etc/php/8.3/fpm/php.ini
-sed -i 's/max_execution_time = .*/max_execution_time = 3600/' /etc/php/8.3/fpm/php.ini
-sed -i 's/max_input_time = .*/max_input_time = 3600/' /etc/php/8.3/fpm/php.ini
-sed -i 's/;max_input_vars = .*/max_input_vars = 10000/' /etc/php/8.3/fpm/php.ini
-
-# Configure PHP-FPM pool for better performance with high memory
-cat >> /etc/php/8.3/fpm/pool.d/www.conf << 'EOF'
-
-; Performance settings for 32GB server
-pm.max_children = 100
-pm.start_servers = 20
-pm.min_spare_servers = 10
-pm.max_spare_servers = 40
-pm.max_requests = 1000
-EOF
-
-# Setup nginx from template
+# Configure Nginx
 echo "Configuring Nginx..."
-cp "$SCRIPT_DIR/nginx-wordpress.template" /etc/nginx/sites-available/default
-sed -i "s/%%DOMAIN_NAME%%/$DOMAIN_NAME/g" /etc/nginx/sites-available/default
+cp "$SCRIPT_DIR/nginx-wordpress.template" /etc/nginx/sites-available/default || handle_error "Nginx configuration failed"
+sed -i "s/%%DOMAIN_NAME%%/$DOMAIN_NAME/g" /etc/nginx/sites-available/default || handle_error "Nginx domain configuration failed"
 
 # Configure main nginx.conf
+echo "Optimizing Nginx..."
 sed -i 's/# server_names_hash_bucket_size/server_names_hash_bucket_size/' /etc/nginx/nginx.conf
 sed -i '/http {/a \    client_max_body_size 2G;\n    proxy_read_timeout 3600;\n    proxy_connect_timeout 3600;\n    proxy_send_timeout 3600;' /etc/nginx/nginx.conf
 sed -i 's/worker_processes auto;/worker_processes auto;\nworker_rlimit_nofile 65535;/' /etc/nginx/nginx.conf
 
-# Update events block
-if grep -q "events {" /etc/nginx/nginx.conf; then
-   cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-   sed -i '/events {/,/}/ {
-       /worker_connections/d
-       /use epoll/d
-       /multi_accept/d
-   }' /etc/nginx/nginx.conf
-   sed -i '/events {/a \    worker_connections 4096;\n    use epoll;\n    multi_accept on;' /etc/nginx/nginx.conf
-fi
+# Update nginx events block
+sed -i '/events {/,/}/ {
+    /worker_connections/d
+    /use epoll/d
+    /multi_accept/d
+}' /etc/nginx/nginx.conf
+sed -i '/events {/a \    worker_connections 4096;\n    use epoll;\n    multi_accept on;' /etc/nginx/nginx.conf
 
-# Test nginx config and restart services
-nginx -t && systemctl restart nginx php8.3-fpm
+# Verify configurations
+echo "Verifying configurations..."
+nginx -t || handle_error "Nginx configuration test failed"
+php-fpm8.3 -t || handle_error "PHP-FPM configuration test failed"
 
-# Get SSL cert
-echo "Getting SSL certificate..."
-certbot --nginx --non-interactive --agree-tos -m $EMAIL -d $DOMAIN_NAME
+# Restart services
+echo "Restarting services..."
+systemctl restart php8.3-fpm || handle_error "PHP-FPM restart failed"
+systemctl restart nginx || handle_error "Nginx restart failed"
+
+# Get SSL certificate
+echo "Obtaining SSL certificate..."
+certbot --nginx --non-interactive --agree-tos -m "$EMAIL" -d "$DOMAIN_NAME" || handle_error "SSL certificate acquisition failed"
 
 # Install WP-CLI
-curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+echo "Installing WP-CLI..."
+curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar || handle_error "WP-CLI download failed"
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
 
-# Set up real cron for WordPress
+# Set up WordPress cron in system crontab
+echo "Configuring system cron for WordPress..."
 echo "*/5 * * * * www-data php /var/www/html/wp-cron.php > /dev/null 2>&1" > /etc/cron.d/wordpress
 
 # Create uploads directory
@@ -161,47 +186,35 @@ mkdir -p /var/www/html/wp-content/uploads
 chown -R www-data:www-data /var/www/html/wp-content/uploads
 chmod -R 755 /var/www/html/wp-content/uploads
 
-# Configure MariaDB for better performance
-cat > /etc/mysql/conf.d/wordpress.cnf << 'EOF'
-[mysqld]
-innodb_buffer_pool_size = 8G
-innodb_log_file_size = 1G
-innodb_flush_log_at_trx_commit = 2
-innodb_flush_method = O_DIRECT
-query_cache_type = 1
-query_cache_size = 256M
-tmp_table_size = 512M
-max_heap_table_size = 512M
-EOF
-
-systemctl restart mariadb
-
 # Save credentials
+echo "Saving credentials..."
 cat > /root/wordpress-credentials.txt << EOF
 =========================
-WordPress Audio Site Installation Details
+WordPress High Performance Installation Details
 =========================
+Domain: $DOMAIN_NAME
 Database Name: $DB_NAME
 Database User: $DB_USER
 Database Password: $DB_PASS
 MySQL Root Password: $MYSQL_ROOT_PASS
 =========================
 Performance Configuration:
-- PHP Memory: 4GB
-- WP Memory: 2GB (max 4GB)
-- MariaDB Buffer: 8GB
+- PHP Memory: 8GB
+- WP Memory: 512MB (regular), 8GB (admin)
+- MariaDB Buffer: 20GB
 - Max upload size: 2GB
-- Execution time: 1 hour
+- Extended execution time: 1 hour
 =========================
 EOF
 
 chmod 600 /root/wordpress-credentials.txt
 
-# Display completion message
 echo "=========================="
-echo "WordPress NGINX Installation Complete!"
+echo "WordPress Installation Complete!"
 echo "Optimized for 32GB RAM Server"
 echo "=========================="
+echo "Installation Details:"
+echo "Domain: $DOMAIN_NAME"
 echo "Database Name: $DB_NAME"
 echo "Database User: $DB_USER"
 echo "Database Password: $DB_PASS"
@@ -210,7 +223,9 @@ echo "=========================="
 echo "Credentials saved to: /root/wordpress-credentials.txt"
 echo "Visit https://$DOMAIN_NAME to complete setup"
 echo ""
-echo "Consider installing these plugins for audio handling:"
-echo "- WooCommerce (for selling)"
-echo "- WP Offload Media (for S3/CDN storage)"
-echo "- Seriously Simple Podcasting (for streaming)"
+echo "Post-Installation Recommendations:"
+echo "1. Install a caching plugin"
+echo "2. Configure object caching (Redis recommended)"
+echo "3. Set up a CDN for media delivery"
+echo "4. Monitor PHP-FPM and MariaDB performance"
+echo "5. Regular backup setup"
