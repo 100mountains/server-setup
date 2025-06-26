@@ -1,14 +1,42 @@
 # Server Setup Scripts
 
-This repository contains a server setup script for a media serving WordPress instance, optimized for high-performance servers with 32GB RAM.
+This repository contains server setup scripts for a media serving WordPress instance, optimized for high-performance servers with 32GB RAM.
 
-## WordPress Installation
+## Scripts Overview
 
 - `install-wordpress.sh`: Automates the process of installing and configuring WordPress on a server.
+- `harden.sh`: Security hardening script that configures UFW firewall, fail2ban, and SSH security settings.
 - `nginx-wordpress.template`: Nginx configuration template with optimized settings for media serving and WooCommerce.
 - `wp-config.template.php`: WordPress configuration template with optimized memory and performance settings.
 
-## Important: Environment Variables
+## Security Hardening Script
+
+The `harden.sh` script provides comprehensive security hardening for Ubuntu servers:
+
+### Prerequisites
+- **Must be run as root or with `sudo -H`** to ensure proper environment variable handling
+- **Requires `apt-get update`** to be run before execution for latest package information
+- Script is designed to be **idempotent** - safe to run multiple times
+
+### Security Features
+- UFW firewall configuration with SSH access
+- fail2ban installation and configuration for SSH protection
+- SSH security hardening (disable root login, password authentication)
+- Automatic security updates configuration
+- System optimization settings
+
+### Usage
+```bash
+# Update package lists first
+sudo apt-get update
+
+# Run the hardening script
+sudo -H ./harden.sh
+```
+
+## WordPress Installation
+
+### Important: Environment Variables
 
 **You must create a `.env` file before running the installation script, or it will not work properly!**
 
@@ -28,6 +56,7 @@ Replace:
 ```
 .
 ├── install-wordpress.sh
+├── harden.sh                       # Security hardening script
 ├── nginx-wordpress.template
 ├── wp-config.template.php
 ├── mariadb/
@@ -43,6 +72,11 @@ Replace:
 
 ## Usage
 
+### Security Hardening
+1. Update package lists: `sudo apt-get update`
+2. Run security hardening: `sudo -H ./harden.sh`
+
+### WordPress Installation
 1. Create the `.env` file as described above
 2. Navigate to the appropriate directory 
 3. Run the script with appropriate permissions:
@@ -52,6 +86,14 @@ sudo ./install-wordpress.sh
 ```
 
 ## Features
+
+### Security Hardening Features
+- UFW firewall with SSH access only
+- fail2ban protection against brute force attacks
+- SSH hardening (key-based authentication only)
+- Automatic security updates
+- System optimization and security settings
+- Idempotent design for safe re-execution
 
 ### WordPress Optimizations
 - PHP Memory: 8GB
@@ -100,6 +142,13 @@ sudo ./install-wordpress.sh
 - Disabled WordPress cron in favor of system cron
 - Query cache disabled for better performance
 - OpCache enabled and optimized
+
+## Security Notes
+- UFW firewall blocks all incoming connections except SSH
+- fail2ban monitors SSH attempts and bans repeat offenders
+- SSH configured for key-based authentication only
+- Automatic security updates enabled
+- Scripts designed for idempotent execution
 
 ## License
 

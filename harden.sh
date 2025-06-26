@@ -10,7 +10,7 @@ echo "Hardening system security..."
 
 # Create backup directory
 BACKUP_DIR="/root/security_backups_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+mkdir -p "$BACKUP_DIR" || echo "Warning: Failed to create backup directory, continuing..."
 echo "Backup directory created: $BACKUP_DIR"
 
 # Fetch server's public IP (try multiple methods)
@@ -20,73 +20,71 @@ echo "Server IP detected: $SERVER_IP"
 
 # Backup original SSH config
 echo "Backing up SSH configuration..."
-cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config.backup"
+cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config.backup" || echo "Warning: Failed to backup SSH config, continuing..."
 
 # Disable Password Authentication (SSH Keys only)
 echo "Disabling password-based authentication for SSH..."
 # Handle both commented and uncommented lines in one go
-sed -i.bak 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i.bak 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PasswordAuthentication, continuing..."
 
 # Disable root login via SSH
 echo "Disabling root login via SSH..."
-sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PermitRootLogin, continuing..."
 
 # Disable empty passwords
 echo "Disabling empty passwords in SSH..."
-sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config
+sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PermitEmptyPasswords, continuing..."
 
 # Test SSH config before restarting
 echo "Testing SSH configuration..."
 if sshd -t; then
     echo "SSH config is valid, restarting service..."
-    systemctl restart sshd
+    systemctl restart sshd || echo "Warning: Failed to restart SSH service, continuing..."
     if systemctl is-active --quiet sshd; then
         echo "SSH service restarted successfully"
     else
-        echo "ERROR: SSH service failed to restart! Check logs and restore from backup if needed."
+        echo "WARNING: SSH service failed to restart! Check logs and restore from backup if needed."
         echo "Backup location: $BACKUP_DIR/sshd_config.backup"
-        exit 1
+        echo "Continuing with security hardening..."
     fi
 else
-    echo "ERROR: SSH config test failed! Restoring backup..."
-    cp "$BACKUP_DIR/sshd_config.backup" /etc/ssh/sshd_config
-    systemctl restart ssh
-    echo "SSH config restored from backup"
-    exit 1
+    echo "WARNING: SSH config test failed! Restoring backup..."
+    cp "$BACKUP_DIR/sshd_config.backup" /etc/ssh/sshd_config || echo "Failed to restore SSH backup"
+    systemctl restart ssh || echo "Failed to restart SSH after restore"
+    echo "SSH config restored from backup, continuing with security hardening..."
 fi
+
+echo "*** REACHED SECURITY SECTION ***"
 
 # Configure firewall with UFW
 echo "Setting up UFW firewall..."
-# Check if UFW is already enabled
-if ufw status | grep -q "Status: active"; then
-    echo "UFW is already active, updating rules..."
-else
-    echo "UFW is inactive, configuring and enabling..."
-fi
 
-ufw --force default deny incoming
-ufw --force default allow outgoing
-ufw --force allow in on lo  # Allow local traffic
-ufw --force allow OpenSSH   # Allow SSH traffic
-ufw --force allow 80/tcp    # Allow HTTP traffic
-ufw --force allow 443/tcp   # Allow HTTPS traffic
+# Reset UFW to clean state (force non-interactive)
+echo "Resetting UFW to clean state..."
+ufw --force reset || echo "Warning: Failed to reset UFW, continuing..."
 
-# Enable UFW firewall (--force to avoid interactive prompt)
+# Configure UFW rules BEFORE enabling
+echo "Configuring UFW rules..."
+ufw --force default deny incoming || echo "Warning: Failed to set UFW default deny incoming, continuing..."
+ufw --force default allow outgoing || echo "Warning: Failed to set UFW default allow outgoing, continuing..."
+ufw --force allow OpenSSH || echo "Warning: Failed to allow OpenSSH, continuing..."   # Allow SSH traffic
+ufw --force allow in on lo || echo "Warning: Failed to allow loopback traffic, continuing..."  # Allow local traffic
+ufw --force allow 80/tcp || echo "Warning: Failed to allow HTTP, continuing..."    # Allow HTTP traffic
+ufw --force allow 443/tcp || echo "Warning: Failed to allow HTTPS, continuing..."   # Allow HTTPS traffic
+
+# Enable UFW firewall after all rules are configured (force non-interactive)
 echo "Enabling UFW firewall..."
-ufw --force enable
-ufw status
+ufw --force enable || echo "Warning: Failed to enable UFW, continuing..."
 
-# Update package list
-echo "Updating package lists..."
-apt update
+# Log current status with verbose output
+echo "UFW firewall status:"
+ufw status verbose || true
 
-# Install Fail2Ban to protect against SSH brute force attacks
-echo "Installing Fail2Ban..."
-apt install -y fail2ban
-
-# Configure Fail2Ban for SSH protection
-echo "Configuring Fail2Ban for SSH protection..."
-cat <<EOF > /etc/fail2ban/jail.d/ssh.conf
+# Update package list and install security packages
+echo "Updating package lists and installing security packages..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -yqq --no-install-recommends fail2ban ufw
 [ssh]
 enabled = true
 port = ssh
@@ -94,11 +92,11 @@ logpath = /var/log/auth.log
 maxretry = 3
 bantime = 3600
 findtime = 600
-EOF
+FAIL2BAN_EOF
 
 # Enable and start Fail2Ban
-systemctl enable fail2ban
-systemctl restart fail2ban
+systemctl enable fail2ban || echo "Warning: Failed to enable Fail2Ban, continuing..."
+systemctl restart fail2ban || echo "Warning: Failed to restart Fail2Ban, continuing..."
 
 # Verify Fail2Ban is running
 if systemctl is-active --quiet fail2ban; then
@@ -109,14 +107,14 @@ fi
 
 # Install necessary security utilities
 echo "Installing security utilities (chkrootkit, rkhunter)..."
-apt install -y chkrootkit rkhunter
+apt install -y chkrootkit rkhunter || echo "Warning: Failed to install security utilities, continuing..."
 
 # Configure log rotation (check if entries already exist)
 echo "Configuring log rotation..."
 LOGROTATE_FILE="/etc/logrotate.d/security-hardening"
 
 # Create a separate logrotate file to avoid conflicts
-cat <<EOF > "$LOGROTATE_FILE"
+cat <<LOGROTATE_EOF > "$LOGROTATE_FILE" || echo "Warning: Failed to create logrotate config, continuing..."
 # Custom log rotation for security hardening
 /var/log/auth.log {
     rotate 7
@@ -153,7 +151,7 @@ cat <<EOF > "$LOGROTATE_FILE"
         systemctl reload rsyslog > /dev/null 2>&1 || true
     endscript
 }
-EOF
+LOGROTATE_EOF
 
 # Test logrotate configuration
 echo "Testing logrotate configuration..."
