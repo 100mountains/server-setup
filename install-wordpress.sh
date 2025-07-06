@@ -209,19 +209,19 @@ echo ""
 echo "Installing Bandfront child theme..."
 
 # Copy the Bandfront theme to WordPress themes directory
-cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/
+cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/storefront-child
 
 # Set proper permissions for the theme
-chown -R www-data:www-data /var/www/html/wp-content/themes/bandfront
-find /var/www/html/wp-content/themes/bandfront -type d -exec chmod 755 {} \;
-find /var/www/html/wp-content/themes/bandfront -type f -exec chmod 644 {} \;
+chown -R www-data:www-data /var/www/html/wp-content/themes/storefront-child
+find /var/www/html/wp-content/themes/storefront-child -type d -exec chmod 755 {} \;
+find /var/www/html/wp-content/themes/storefront-child -type f -exec chmod 644 {} \;
 
 # Install parent theme (Storefront) via WP-CLI
 echo "Installing Storefront parent theme..."
 sudo -u www-data wp --path=/var/www/html theme install storefront --activate
 
-# Activate the Bandfront child theme
-echo "Activating Bandfront child theme..."
-sudo -u www-data wp --path=/var/www/html theme activate bandfront
+# Activate the Storefront Child theme
+echo "Activating Bandfront theme..."
+sudo -u www-data wp --path=/var/www/html theme activate storefront-child
 
-echo "Bandfront child theme installation complete!"
+echo "Storefront Child theme installation complete!"
