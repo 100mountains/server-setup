@@ -1,0 +1,3 @@
+[submodule "themes/bandfront"]
+	path = themes/bandfront
+	url = https://github.com/100mountains/bandfront.git

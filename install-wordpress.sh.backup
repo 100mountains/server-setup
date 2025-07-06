@@ -210,29 +210,7 @@ echo "=========================="
 echo "Credentials saved to: /root/wordpress-credentials.txt"
 echo "Visit https://$DOMAIN_NAME to complete setup"
 echo ""
-echo "Theme: Bandfront child theme activated"\necho ""\necho "Consider installing these plugins for audio handling:"
+echo "Consider installing these plugins for audio handling:"
 echo "- WooCommerce (for selling)"
 echo "- WP Offload Media (for S3/CDN storage)"
 echo "- Seriously Simple Podcasting (for streaming)"
-
-# Install and activate the Bandfront child theme
-echo "Installing Bandfront child theme..."
-
-# Copy the Bandfront theme to WordPress themes directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/
-
-# Set proper permissions for the theme
-chown -R www-data:www-data /var/www/html/wp-content/themes/bandfront
-find /var/www/html/wp-content/themes/bandfront -type d -exec chmod 755 {} \;
-find /var/www/html/wp-content/themes/bandfront -type f -exec chmod 644 {} \;
-
-# Install parent theme (Storefront) via WP-CLI
-echo "Installing Storefront parent theme..."
-sudo -u www-data wp --path=/var/www/html theme install storefront --activate
-
-# Activate the Bandfront child theme
-echo "Activating Bandfront child theme..."
-sudo -u www-data wp --path=/var/www/html theme activate bandfront
-
-echo "Bandfront child theme installation complete!"
