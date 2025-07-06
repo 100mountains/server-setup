@@ -17,7 +17,7 @@ fi
 
 # Read WordPress credentials
 if [ -f /root/wordpress_credentials.txt ]; then
-    source /root/wordpress_credentials.txt
+    source /root/wordpress-credentials.txt
 else
     echo "Error: WordPress credentials file not found"
     exit 1
