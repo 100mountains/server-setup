@@ -1,0 +1,48 @@
+# Custom log rotation for security hardening
+/var/log/auth.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/syslog {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/kern.log {
+    rotate 7
+    weekly
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/fail2ban.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload fail2ban > /dev/null 2>&1 || true
+    endscript
+}

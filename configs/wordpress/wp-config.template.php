@@ -54,7 +54,7 @@ define('WP_MAX_MEMORY_LIMIT', '8G');    // Admin/upload operations limit
 
 // PHP settings optimized for high-performance server
 @ini_set('memory_limit', '8G');
-@ini_set('upload_max_size', '2048M');
+@ini_set('upload_max_filesize', '2048M');
 @ini_set('post_max_size', '2048M');
 @ini_set('max_execution_time', '3600');
 @ini_set('max_input_time', '3600');

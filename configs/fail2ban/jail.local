@@ -1,0 +1,73 @@
+[DEFAULT]
+# Default ban time for all jails (24 hours)
+bantime = 86400
+
+# Default find time (10 minutes)
+findtime = 600
+
+# Default max retry (5 attempts)
+maxretry = 1
+
+# Ignore local networks (adjust as needed)
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+# Override defaults for SSH
+bantime = 86400
+maxretry = 3
+findtime = 600
+
+[nginx-http-auth]
+enabled = true
+port = http,https
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 3600
+
+[nginx-bad-request]
+enabled = true
+port = http,https
+filter = nginx-bad-request
+logpath = /var/log/nginx/access.log
+maxretry = 10
+bantime = 3600
+
+[nginx-botsearch]
+enabled = true
+port = http,https
+filter = nginx-botsearch
+logpath = /var/log/nginx/access.log
+maxretry = 1
+bantime = 86400
+
+[nginx-limit-req]
+enabled = true
+port = http,https
+filter = nginx-limit-req
+logpath = /var/log/nginx/error.log
+maxretry = 10
+bantime = 600
+
+[recidive]
+enabled = true
+filter = recidive
+logpath = /var/log/fail2ban.log
+action = %(action_mwl)s
+protocol = all
+bantime = 604800
+findtime = 86400
+maxretry = 3
+
+[nginx-wordpress]
+enabled = true
+port = http,https
+filter = nginx-wordpress
+logpath = /var/log/nginx/access.log
+maxretry = 5
+bantime = 86400
+findtime = 600

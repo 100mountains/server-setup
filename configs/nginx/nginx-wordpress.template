@@ -50,6 +50,29 @@ server {
        # Disable access logging for audio files to save disk I/O
        access_log off;
    }
+
+   # Block direct access to audio files in uploads (force through WooCommerce)
+   location ~* /wp-content/uploads/.*\.(mp3|mp4|m4a|flac|wav|ogg|aac|wma|aiff|ape)$ {
+       deny all;
+   }
+
+   # Internal location for X-Accel-Redirect serving
+   location /protected-woo-files/ {
+       internal;
+       alias /var/www/html/wp-content/uploads/woocommerce_uploads/;
+
+       # Enable range requests for audio streaming
+       add_header Accept-Ranges bytes;
+       add_header Cache-Control "private, no-cache";
+   }
+
+   # Protect WooCommerce upload folder from direct access
+   location ~* /wp-content/uploads/woocommerce_uploads/ {
+       if ( $upstream_http_x_accel_redirect = "" ) {
+           return 403;
+       }
+       internal;
+   }
    
    location ~ /\.ht {
        deny all;

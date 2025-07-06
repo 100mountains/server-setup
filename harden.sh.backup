@@ -6,16 +6,6 @@ if [ "$EUID" -ne 0 ]; then
    exit 1
 fi
 
-# Check if config files exist
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="$SCRIPT_DIR/configs"
-
-if [ ! -d "$CONFIG_DIR" ]; then
-    echo "Error: Config directory not found at $CONFIG_DIR"
-    echo "Please ensure the configs/ directory exists with fail2ban and logrotate subdirectories"
-    exit 1
-fi
-
 echo "Hardening system security..."
 
 # Create backup directory
@@ -103,43 +93,84 @@ echo "Configuring optimized fail2ban with web server protection..."
 echo "Backing up existing fail2ban configuration..."
 cp -r /etc/fail2ban/ "$BACKUP_DIR/fail2ban_backup/" 2>/dev/null || echo "Warning: Failed to backup fail2ban config, continuing..."
 
-# Copy fail2ban configuration files
-echo "Copying fail2ban configuration files..."
-if [ -f "$CONFIG_DIR/fail2ban/jail.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/jail.local" /etc/fail2ban/jail.local || echo "Warning: Failed to copy jail.local, continuing..."
-    echo "jail.local configuration copied successfully"
-else
-    echo "Warning: jail.local config file not found at $CONFIG_DIR/fail2ban/jail.local"
-fi
+# Create comprehensive jail.local configuration
+cat > /etc/fail2ban/jail.local << 'FAIL2BAN_EOF'
+[DEFAULT]
+# Default ban time for all jails (24 hours)
+bantime = 86400
 
-if [ -f "$CONFIG_DIR/fail2ban/sshd.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/sshd.local" /etc/fail2ban/jail.d/sshd.local || echo "Warning: Failed to copy sshd.local, continuing..."
-    echo "sshd.local configuration copied successfully"
-else
-    echo "Warning: sshd.local config file not found at $CONFIG_DIR/fail2ban/sshd.local"
-fi
+# Default find time (10 minutes)
+findtime = 600
 
-# Copy custom filter files
-if [ -f "$CONFIG_DIR/fail2ban/nginx-wordpress.conf" ]; then
-    cp "$CONFIG_DIR/fail2ban/nginx-wordpress.conf" /etc/fail2ban/filter.d/nginx-wordpress.conf || echo "Warning: Failed to copy nginx-wordpress filter, continuing..."
-    echo "nginx-wordpress filter copied successfully"
-else
-    echo "Warning: nginx-wordpress filter not found at $CONFIG_DIR/fail2ban/nginx-wordpress.conf"
-fi
+# Default max retry (5 attempts)
+maxretry = 5
 
-if [ -f "$CONFIG_DIR/fail2ban/nginx-botsearch.conf" ]; then
-    cp "$CONFIG_DIR/fail2ban/nginx-botsearch.conf" /etc/fail2ban/filter.d/nginx-botsearch.conf || echo "Warning: Failed to copy nginx-botsearch filter, continuing..."
-    echo "nginx-botsearch filter copied successfully"
-else
-    echo "Warning: nginx-botsearch filter not found at $CONFIG_DIR/fail2ban/nginx-botsearch.conf"
-fi
+# Ignore local networks (adjust as needed)
+ignoreip = 127.0.0.1/8 ::1
 
-if [ -f "$CONFIG_DIR/fail2ban/sshd.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/sshd.local" /etc/fail2ban/jail.d/sshd.local || echo "Warning: Failed to copy sshd.local, continuing..."
-    echo "sshd.local configuration copied successfully"
-else
-    echo "Warning: sshd.local config file not found at $CONFIG_DIR/fail2ban/sshd.local"
-fi
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+# Enhanced SSH protection - stricter than defaults
+bantime = 86400
+maxretry = 3
+findtime = 600
+
+[nginx-http-auth]
+enabled = true
+port = http,https
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 3600
+
+[nginx-bad-request]
+enabled = true
+port = http,https
+filter = nginx-bad-request
+logpath = /var/log/nginx/access.log
+maxretry = 10
+bantime = 3600
+
+[nginx-botsearch]
+enabled = true
+port = http,https
+filter = nginx-botsearch
+logpath = /var/log/nginx/access.log
+maxretry = 5
+bantime = 86400
+
+[nginx-limit-req]
+enabled = true
+port = http,https
+filter = nginx-limit-req
+logpath = /var/log/nginx/error.log
+maxretry = 10
+bantime = 600
+
+[recidive]
+enabled = true
+filter = recidive
+logpath = /var/log/fail2ban.log
+action = %(action_mwl)s
+protocol = all
+bantime = 604800
+findtime = 86400
+maxretry = 3
+FAIL2BAN_EOF
+
+# Update the sshd.local file to ensure SSH settings take precedence
+cat > /etc/fail2ban/jail.d/sshd.local << 'SSHD_EOF'
+[sshd]
+enabled = true
+bantime = 86400
+maxretry = 3
+findtime = 600
+SSHD_EOF
+
+echo "fail2ban configuration files created successfully"
 
 # Enable and start Fail2Ban
 echo "Starting and enabling fail2ban service..."
@@ -164,17 +195,61 @@ fi
 echo "Installing security utilities (chkrootkit, rkhunter)..."
 apt install -y chkrootkit rkhunter || echo "Warning: Failed to install security utilities, continuing..."
 
-# Configure log rotation
+# Configure log rotation (check if entries already exist)
 echo "Configuring log rotation..."
 LOGROTATE_FILE="/etc/logrotate.d/security-hardening"
 
-# Copy logrotate configuration file
-if [ -f "$CONFIG_DIR/logrotate/security-hardening" ]; then
-    cp "$CONFIG_DIR/logrotate/security-hardening" "$LOGROTATE_FILE" || echo "Warning: Failed to copy logrotate config, continuing..."
-    echo "Logrotate configuration copied successfully"
-else
-    echo "Warning: Logrotate config file not found at $CONFIG_DIR/logrotate/security-hardening"
-fi
+# Create a separate logrotate file to avoid conflicts
+cat > "$LOGROTATE_FILE" << 'LOGROTATE_EOF' || echo "Warning: Failed to create logrotate config, continuing..."
+# Custom log rotation for security hardening
+/var/log/auth.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/syslog {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/kern.log {
+    rotate 7
+    weekly
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/fail2ban.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload fail2ban > /dev/null 2>&1 || true
+    endscript
+}
+LOGROTATE_EOF
 
 # Test logrotate configuration
 echo "Testing logrotate configuration..."
