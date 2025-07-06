@@ -15,7 +15,7 @@ fi
 
 # Load environment variables from .env file, excluding comments
 if [ -f .env ]; then
-  export "$(grep -v '^#' .env | xargs)"
+  export $(grep -v "^#" .env | xargs)
 fi
 
 # Check for required env variables
