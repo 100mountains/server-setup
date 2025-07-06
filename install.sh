@@ -32,8 +32,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Source environment variables from .env if it exists
-if [[ -f .env ]]; then
-    source .env
+# Load environment variables from .env file
+if [ -f .env ]; then
+  set -a  # automatically export all variables
+  source .env
+  set +a  # disable automatic export
 fi
 
 # Get domain and email (from .env, environment, or prompt)
