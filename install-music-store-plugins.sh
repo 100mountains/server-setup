@@ -85,7 +85,7 @@ install_plugin "WooCommerce PayPal Payments" "woocommerce-paypal-payments"
 install_plugin "Theme My Login" "theme-my-login"
 
 # Install WP Armour - Honeypot Anti Spam
-install_plugin "WP Armour - Honeypot Anti Spam" "wp-armour-extended"
+install_plugin "WP Armour - Honeypot Anti Spam" "wp-armour"
 
 # Install WooCommerce Tax
 install_plugin "WooCommerce Tax" "woocommerce-tax"

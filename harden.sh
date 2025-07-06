@@ -162,7 +162,7 @@ fi
 
 # Install necessary security utilities
 echo "Installing security utilities (chkrootkit, rkhunter)..."
-apt install -y chkrootkit rkhunter || echo "Warning: Failed to install security utilities, continuing..."
+apt install -y --no-install-recommends chkrootkit rkhunter || echo "Warning: Failed to install security utilities, continuing..."
 
 # Configure log rotation
 echo "Configuring log rotation..."
