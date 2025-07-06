@@ -91,13 +91,30 @@ if ! ping -c 1 google.com &> /dev/null; then
 fi
 
 # Check if SSH key authentication is working (since we're hardening SSH)
-if [[ -z "${SSH_CLIENT:-}" && -z "${SSH_TTY:-}" ]]; then
-    warning "Not running over SSH - make sure you have SSH key access before hardening"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+# Check for SSH keys in authorized_keys
+ssh_keys_exist=false
+if [[ -f ~/.ssh/authorized_keys && -s ~/.ssh/authorized_keys ]]; then
+    ssh_keys_exist=true
+fi
+
+# Check if running over SSH (may not work with sudo)
+ssh_connection_detected=false
+if [[ -n "${SSH_CLIENT:-}" || -n "${SSH_TTY:-}" || -n "${SSH_CONNECTION:-}" ]]; then
+    ssh_connection_detected=true
+fi
+
+# Warn if no SSH keys found
+if [[ "$ssh_keys_exist" == false ]]; then
+    error "No SSH keys found in ~/.ssh/authorized_keys"
+    echo "SSH keys are required because this script disables password authentication"
+    echo "Please add your SSH public key before running this script"
+    exit 1
+fi
+
+# Warn if not detected as SSH connection (but continue if keys exist)
+if [[ "$ssh_connection_detected" == false ]]; then
+    warning "SSH connection not detected (this may be normal with sudo)"
+    warning "Continuing because SSH keys were found in ~/.ssh/authorized_keys"
 fi
 
 log "Pre-flight checks passed"
