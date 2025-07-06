@@ -77,10 +77,10 @@ ufw --force reset || echo "Warning: Failed to reset UFW, continuing..."
 echo "Configuring UFW rules..."
 ufw --force default deny incoming
 ufw --force default allow outgoing
-ufw --force allow OpenSSH
-ufw --force allow in on lo
-ufw --force allow 80/tcp
-ufw --force allow 443/tcp
+ufw allow OpenSSH
+ufw allow in on lo
+ufw allow 80/tcp
+ufw allow 443/tcp
 
 # Enable UFW firewall after all rules are configured (force non-interactive)
 echo "Enabling UFW firewall..."
