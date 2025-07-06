@@ -30,36 +30,36 @@ echo "Server IP detected: $SERVER_IP"
 
 # Backup original SSH config
 echo "Backing up SSH configuration..."
-cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config.backup" || echo "Warning: Failed to backup SSH config, continuing..."
+cp /etc/ssh/ssh_config "$BACKUP_DIR/ssh_config.backup" || echo "Warning: Failed to backup SSH config, continuing..."
 
 # Disable Password Authentication (SSH Keys only)
 echo "Disabling password-based authentication for SSH..."
 # Handle both commented and uncommented lines in one go
-sed -i.bak 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PasswordAuthentication, continuing..."
+sed -i.bak 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/ssh_config || echo "Warning: Failed to modify PasswordAuthentication, continuing..."
 
 # Disable root login via SSH
 echo "Disabling root login via SSH..."
-sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PermitRootLogin, continuing..."
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/ssh_config || echo "Warning: Failed to modify PermitRootLogin, continuing..."
 
 # Disable empty passwords
 echo "Disabling empty passwords in SSH..."
-sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config || echo "Warning: Failed to modify PermitEmptyPasswords, continuing..."
+sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/ssh_config || echo "Warning: Failed to modify PermitEmptyPasswords, continuing..."
 
 # Test SSH config before restarting
 echo "Testing SSH configuration..."
-if sshd -t; then
+if ssh -t; then
     echo "SSH config is valid, restarting service..."
-    systemctl restart sshd || echo "Warning: Failed to restart SSH service, continuing..."
-    if systemctl is-active --quiet sshd; then
+    systemctl restart ssh || echo "Warning: Failed to restart SSH service, continuing..."
+    if systemctl is-active --quiet ssh; then
         echo "SSH service restarted successfully"
     else
         echo "WARNING: SSH service failed to restart! Check logs and restore from backup if needed."
-        echo "Backup location: $BACKUP_DIR/sshd_config.backup"
+        echo "Backup location: $BACKUP_DIR/ssh_config.backup"
         echo "Continuing with security hardening..."
     fi
 else
     echo "WARNING: SSH config test failed! Restoring backup..."
-    cp "$BACKUP_DIR/sshd_config.backup" /etc/ssh/sshd_config || echo "Failed to restore SSH backup"
+    cp "$BACKUP_DIR/ssh_config.backup" /etc/ssh/ssh_config || echo "Failed to restore SSH backup"
     systemctl restart ssh || echo "Failed to restart SSH after restore"
     echo "SSH config restored from backup, continuing with security hardening..."
 fi
@@ -112,11 +112,11 @@ else
     echo "Warning: jail.local config file not found at $CONFIG_DIR/fail2ban/jail.local"
 fi
 
-if [ -f "$CONFIG_DIR/fail2ban/sshd.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/sshd.local" /etc/fail2ban/jail.d/sshd.local || echo "Warning: Failed to copy sshd.local, continuing..."
-    echo "sshd.local configuration copied successfully"
+if [ -f "$CONFIG_DIR/fail2ban/ssh.local" ]; then
+    cp "$CONFIG_DIR/fail2ban/ssh.local" /etc/fail2ban/jail.d/ssh.local || echo "Warning: Failed to copy ssh.local, continuing..."
+    echo "ssh.local configuration copied successfully"
 else
-    echo "Warning: sshd.local config file not found at $CONFIG_DIR/fail2ban/sshd.local"
+    echo "Warning: ssh.local config file not found at $CONFIG_DIR/fail2ban/ssh.local"
 fi
 
 # Copy custom filter files
@@ -134,11 +134,11 @@ else
     echo "Warning: nginx-botsearch filter not found at $CONFIG_DIR/fail2ban/nginx-botsearch.conf"
 fi
 
-if [ -f "$CONFIG_DIR/fail2ban/sshd.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/sshd.local" /etc/fail2ban/jail.d/sshd.local || echo "Warning: Failed to copy sshd.local, continuing..."
-    echo "sshd.local configuration copied successfully"
+if [ -f "$CONFIG_DIR/fail2ban/ssh.local" ]; then
+    cp "$CONFIG_DIR/fail2ban/ssh.local" /etc/fail2ban/jail.d/ssh.local || echo "Warning: Failed to copy ssh.local, continuing..."
+    echo "ssh.local configuration copied successfully"
 else
-    echo "Warning: sshd.local config file not found at $CONFIG_DIR/fail2ban/sshd.local"
+    echo "Warning: ssh.local config file not found at $CONFIG_DIR/fail2ban/ssh.local"
 fi
 
 # Enable and start Fail2Ban
@@ -210,7 +210,7 @@ echo "Backup Location: $BACKUP_DIR"
 echo "==========================="
 echo ""
 echo "IMPORTANT: Make sure you have SSH keys set up before logging out!"
-echo "If you get locked out, restore SSH config from: $BACKUP_DIR/sshd_config.backup"
+echo "If you get locked out, restore SSH config from: $BACKUP_DIR/ssh_config.backup"
 echo ""
 echo "fail2ban monitoring commands:"
 echo "  - Check status: sudo fail2ban-client status"
