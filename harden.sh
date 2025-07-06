@@ -76,11 +76,11 @@ ufw --force reset || echo "Warning: Failed to reset UFW, continuing..."
 # Configure UFW rules BEFORE enabling
 echo "Configuring UFW rules..."
 ufw --force default deny incoming || echo "Warning: Failed to set UFW default deny incoming, continuing..."
-ufw --force default allow outgoing || echo "Warning: Failed to set UFW default allow outgoing, continuing..."
-ufw --force allow OpenSSH || echo "Warning: Failed to allow OpenSSH, continuing..."   # Allow SSH traffic
-ufw --force allow in on lo || echo "Warning: Failed to allow loopback traffic, continuing..."  # Allow local traffic
-ufw --force allow 80/tcp || echo "Warning: Failed to allow HTTP, continuing..."    # Allow HTTP traffic
-ufw --force allow 443/tcp || echo "Warning: Failed to allow HTTPS, continuing..."   # Allow HTTPS traffic
+ufw --force default allow outgoing
+ufw --force allow OpenSSH
+ufw --force allow in on lo
+ufw --force allow 80/tcp
+ufw --force allow 443/tcp
 
 # Enable UFW firewall after all rules are configured (force non-interactive)
 echo "Enabling UFW firewall..."
