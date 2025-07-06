@@ -75,7 +75,7 @@ ufw --force reset || echo "Warning: Failed to reset UFW, continuing..."
 
 # Configure UFW rules BEFORE enabling
 echo "Configuring UFW rules..."
-ufw --force default deny incoming || echo "Warning: Failed to set UFW default deny incoming, continuing..."
+ufw --force default deny incoming
 ufw --force default allow outgoing
 ufw --force allow OpenSSH
 ufw --force allow in on lo
