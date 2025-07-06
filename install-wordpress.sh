@@ -148,19 +148,11 @@ mkdir -p /var/www/html/wp-content/uploads
 chown -R www-data:www-data /var/www/html/wp-content/uploads
 chmod -R 755 /var/www/html/wp-content/uploads
 
-# Configure MariaDB for better performance
-cat > /etc/mysql/conf.d/wordpress.cnf << 'EOF'
-[mysqld]
-innodb_buffer_pool_size = 8G
-innodb_log_file_size = 1G
-innodb_flush_log_at_trx_commit = 2
-innodb_flush_method = O_DIRECT
-query_cache_type = 1
-query_cache_size = 256M
-tmp_table_size = 512M
-max_heap_table_size = 512M
-EOF
 
+
+# Apply MariaDB configuration template
+echo "Applying MariaDB configuration template..."
+cp "$SCRIPT_DIR/configs/mariadb/conf.d/60-optimizations.cnf" /etc/mysql/mariadb.conf.d/
 systemctl restart mariadb
 
 # Save credentials
