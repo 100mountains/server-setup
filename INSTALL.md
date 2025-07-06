@@ -5,13 +5,34 @@ Wordpress Child Theme Installation
 installs https://github.com/100mountains/bandfront
 
 
-Wordpress Plugin Installation
+## WordPress Plugin Installation
 
-install_plugin "WooCommerce" "woocommerce"
-install_plugin "WooCommerce PayPal Payments" "woocommerce-paypal-payments"  
-install_plugin "Theme My Login" "theme-my-login"
-install_plugin "WP Armour - Honeypot Anti Spam" "wp-armour-extended"
-install_plugin "WooCommerce Tax" "woocommerce-tax"
+The `install-music-store-plugins.sh` script automatically installs and configures essential plugins for your music store:
+
+### 🛒 E-Commerce Platform
+| Plugin | Purpose | Configuration |
+|--------|---------|---------------|
+| **WooCommerce** | Core e-commerce platform | Optimized for digital downloads |
+| **WooCommerce PayPal Payments** | PayPal payment processing | Ready for configuration |
+| **WooCommerce Tax** | Automated tax calculation | Enabled for compliance |
+
+### 👤 User Experience
+| Plugin | Purpose | Configuration |
+|--------|---------|---------------|
+| **Theme My Login** | Custom login/registration | Enhanced user experience |
+| **WP Armour - Honeypot Anti Spam** | Spam protection | Honeypot enabled |
+
+### 📧 Marketing & Content
+| Plugin | Purpose | Configuration |
+|--------|---------|---------------|
+| **MailPoet** | Email marketing & newsletters | Analytics disabled, ready for setup |
+| **List Category Posts** | Content organization & display | Available for category listings |
+
+### 🎨 Theme Installation
+| Component | Source | Type |
+|-----------|--------|---------|
+| **Storefront** | WordPress.org | Parent theme (auto-installed) |
+| **Bandfront** | GitHub (100mountains/bandfront) | Child theme (Git submodule) |
 
 ## MariaDB Configuration Settings
 
@@ -161,11 +182,17 @@ The `install-music-store-plugins.sh` script installs and configures essential pl
 | WooCommerce PayPal Payments | woocommerce-paypal-payments | PayPal payment processing |
 | WooCommerce Tax | woocommerce-tax | Automated tax calculation |
 
-### User Experience
+### User Experience & Security
 | Plugin | Slug | Purpose |
 |--------|------|---------|
 | Theme My Login | theme-my-login | Custom login/registration pages |
 | WP Armour - Honeypot Anti Spam | wp-armour-extended | Spam protection |
+
+### Marketing & Content Management
+| Plugin | Slug | Purpose |
+|--------|------|---------|
+| MailPoet | mailpoet | Email marketing and newsletters |
+| List Category Posts | list-category-posts | Content organization and display |
 
 ### WordPress Theme
 | Component | Source | Purpose |

@@ -88,6 +88,12 @@ install_plugin "WP Armour - Honeypot Anti Spam" "wp-armour-extended"
 # Install WooCommerce Tax
 install_plugin "WooCommerce Tax" "woocommerce-tax"
 
+# Install List Category Posts (content organization)
+install_plugin "List Category Posts" "list-category-posts"
+
+# Install MailPoet (email marketing)
+install_plugin "MailPoet" "mailpoet"
+
 echo "================================="
 echo "Configuring plugins..."
 echo "================================="
@@ -118,6 +124,11 @@ sudo -u www-data wp --path=/var/www/html option update theme_my_login_enable "1"
 sudo -u www-data wp --path=/var/www/html option update theme_my_login_redirect_to_referer "1"
 
 # Configure WP Armour Anti-Spam
+
+# Configure MailPoet
+echo "Configuring MailPoet..."
+sudo -u www-data wp --path=/var/www/html option update mailpoet_analytics_enabled "0"
+sudo -u www-data wp --path=/var/www/html option update mailpoet_premium_key ""
 echo "Configuring WP Armour Anti-Spam..."
 sudo -u www-data wp --path=/var/www/html option update wp_armour_enable "1"
 sudo -u www-data wp --path=/var/www/html option update wp_armour_honeypot_enable "1"
@@ -151,7 +162,10 @@ echo "Installed Plugins:"
 echo "- WooCommerce (E-commerce platform)"
 echo "- WooCommerce PayPal Payments (Payment gateway)"
 echo "- Theme My Login (Custom login experience)"
-echo "- WP Armour - Honeypot Anti Spam (Security)"
+echo "- WP Armour - Honeypot Anti Spam (Security)
+- WooCommerce Tax (Automated tax calculation)
+- List Category Posts (Content organization)
+- MailPoet (Email marketing)"
 echo "- WooCommerce Tax (Automated tax calculation)"
 echo ""
 echo "Created Directories:"
