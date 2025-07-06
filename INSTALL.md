@@ -1,3 +1,29 @@
+# 🚀 Quick Installation
+
+For a fresh Ubuntu 24.04 server with SSH key access:
+
+```bash
+# Clone and run (will prompt for domain and email if .env not found)
+curl -sSL https://raw.githubusercontent.com/100mountains/server-setup/main/install.sh | sudo bash
+```
+
+**Or manually:**
+
+```bash
+git clone https://github.com/100mountains/server-setup.git
+cd server-setup
+echo 'DOMAIN_NAME="your.domain.com"' > .env
+echo 'EMAIL="admin@your.domain.com"' >> .env
+sudo ./install.sh
+```
+
+---
+
+sudo ./install.sh
+```
+
+---
+
 # CONFIG DESCRIPTIONS
 
 Wordpress Child Theme Installation
