@@ -91,15 +91,6 @@ sed -i "s/%%DOMAIN_NAME%%/$DOMAIN_NAME/g" /var/www/html/wp-config.php
 sed -i "/%%SALT_KEYS%%/r /tmp/wp-salts.txt" /var/www/html/wp-config.php
 sed -i "/%%SALT_KEYS%%/d" /var/www/html/wp-config.php
 
-# Setup PHP configuration from templates
-echo "Configuring PHP from templates..."
-cp "$SCRIPT_DIR/configs/php/8.3/fpm/php.ini.template" /etc/php/8.3/fpm/php.ini
-cp "$SCRIPT_DIR/configs/php/8.3/fpm/pool.d/www.conf.template" /etc/php/8.3/fpm/pool.d/www.conf
-
-# Restart PHP-FPM to apply new configuration
-systemctl restart php8.3-fpm
-
-
 # Clean up
 rm /tmp/wp-salts.txt
 
@@ -109,6 +100,14 @@ find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
 chmod 640 /var/www/html/wp-config.php
 
+# Configure PHP for massive file uploads with HIGH MEMORY (32GB server)
+echo "Configuring PHP for large file uploads..."
+sed -i 's/memory_limit = .*/memory_limit = 4G/' /etc/php/8.3/fpm/php.ini
+sed -i 's/upload_max_filesize = .*/upload_max_filesize = 2G/' /etc/php/8.3/fpm/php.ini
+sed -i 's/post_max_size = .*/post_max_size = 2G/' /etc/php/8.3/fpm/php.ini
+sed -i 's/max_execution_time = .*/max_execution_time = 3600/' /etc/php/8.3/fpm/php.ini
+sed -i 's/max_input_time = .*/max_input_time = 3600/' /etc/php/8.3/fpm/php.ini
+sed -i 's/;max_input_vars = .*/max_input_vars = 10000/' /etc/php/8.3/fpm/php.ini
 
 # Configure PHP-FPM pool for better performance with high memory
 cat >> /etc/php/8.3/fpm/pool.d/www.conf << 'EOF'
@@ -188,8 +187,8 @@ Database Password: $DB_PASS
 MySQL Root Password: $MYSQL_ROOT_PASS
 =========================
 Performance Configuration:
-- PHP Memory: 8GB (from templates)
-- WP Memory: 512MB (max 8GB)
+- PHP Memory: 4GB
+- WP Memory: 2GB (max 4GB)
 - MariaDB Buffer: 8GB
 - Max upload size: 2GB
 - Execution time: 1 hour
