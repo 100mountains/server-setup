@@ -2,6 +2,8 @@
 # WordPress NGINX installation script for Ubuntu 24.04 - Audio/Large File Version
 
 # Check if running as root
+# Get script directory for relative paths
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 if [ "$EUID" -ne 0 ]; then
    echo "Please run as root (use sudo)"
    exit 1
@@ -86,7 +88,6 @@ echo "Fetching WordPress salts..."
 curl -s https://api.wordpress.org/secret-key/1.1/salt/ > /tmp/wp-salts.txt
 
 # Setup wp-config.php from template
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cp "$SCRIPT_DIR/configs/wordpress/wp-config.template.php" /var/www/html/wp-config.php
 
 # Replace placeholders in wp-config.php
@@ -200,7 +201,6 @@ echo "- Seriously Simple Podcasting (for streaming)"
 echo "Installing Bandfront child theme..."
 
 # Copy the Bandfront theme to WordPress themes directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/
 
 # Set proper permissions for the theme
