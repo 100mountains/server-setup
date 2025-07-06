@@ -31,23 +31,23 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Check if .env file exists
-if [[ ! -f .env ]]; then
-    error ".env file not found! Please create it with DOMAIN_NAME and EMAIL variables"
-    echo "Example:"
-    echo 'DOMAIN_NAME="your.domain.com"'
-    echo 'EMAIL="admin@your.domain.com"'
-    exit 1
-fi
-
-# Source environment variables or use parameters
+# Source environment variables from .env if it exists
 if [[ -f .env ]]; then
     source .env
 fi
 
-# Allow overriding with environment variables
-DOMAIN_NAME="${DOMAIN_NAME:-}"
-EMAIL="${EMAIL:-}"
+# Get domain and email (from .env, environment, or prompt)
+if [[ -z "${DOMAIN_NAME:-}" ]]; then
+    echo "Domain name not found in .env file or environment."
+    read -p "Enter your domain name: " DOMAIN_NAME
+fi
+
+if [[ -z "${EMAIL:-}" ]]; then
+    echo "Email not found in .env file or environment."
+    read -p "Enter your admin email: " EMAIL
+fi
+
+
 
 # If no domain provided, prompt for it
 if [[ -z "$DOMAIN_NAME" ]]; then
@@ -56,11 +56,6 @@ fi
 
 if [[ -z "$EMAIL" ]]; then
     read -p "Enter your admin email: " EMAIL
-fi
-# Validate required variables
-if [[ -z "${DOMAIN_NAME:-}" || -z "${EMAIL:-}" ]]; then
-    error "DOMAIN_NAME and EMAIL must be set in .env file"
-    exit 1
 fi
 
 log "Starting server setup for domain: $DOMAIN_NAME"

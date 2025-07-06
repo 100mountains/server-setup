@@ -3,11 +3,13 @@
 For a fresh Ubuntu 24.04 server with SSH key access:
 
 ```bash
-# Clone and run (will prompt for domain and email if .env not found)
-curl -sSL https://raw.githubusercontent.com/100mountains/server-setup/main/install.sh | sudo bash
+# Clone and run with automatic setup
+git clone https://github.com/100mountains/server-setup.git && \
+cd server-setup && \
+sudo ./install.sh
 ```
 
-**Or manually:**
+**Or with pre-configured environment:**
 
 ```bash
 git clone https://github.com/100mountains/server-setup.git
@@ -18,6 +20,7 @@ sudo ./install.sh
 ```
 
 ---
+
 
 sudo ./install.sh
 ```
