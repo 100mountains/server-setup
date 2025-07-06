@@ -108,7 +108,6 @@ cp "$SCRIPT_DIR/configs/php/8.3/fpm/pool.d/www.conf.template" /etc/php/8.3/fpm/p
 # Restart PHP-FPM to apply new configuration
 systemctl restart php8.3-fpm
 
-
 # Clean up
 rm /tmp/wp-salts.txt
 
@@ -117,8 +116,6 @@ chown -R www-data:www-data /var/www/html
 find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
 chmod 640 /var/www/html/wp-config.php
-
-
 
 # Setup nginx from template
 echo "Configuring Nginx..."
@@ -141,6 +138,22 @@ curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.pha
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
 
+# Complete WordPress core installation
+echo "Completing WordPress core installation..."
+WP_ADMIN_PASSWORD=$(openssl rand -base64 12)
+sudo -u www-data wp --path=/var/www/html core install \
+    --url="https://$DOMAIN_NAME" \
+    --title="$DOMAIN_NAME" \
+    --admin_user="admin" \
+    --admin_password="$WP_ADMIN_PASSWORD" \
+    --admin_email="$EMAIL" \
+    --skip-email
+
+echo "WordPress core installation complete!"
+echo "Admin credentials generated successfully"
+
+# Set up real cron for WordPress
+
 # Set up real cron for WordPress
 echo "*/5 * * * * www-data php /var/www/html/wp-cron.php > /dev/null 2>&1" > /etc/cron.d/wordpress
 
@@ -161,6 +174,9 @@ cat > /root/wordpress-credentials.txt << EOF
 =========================
 WordPress Audio Site Installation Details
 =========================
+WordPress Admin User: admin
+WordPress Admin Password: $WP_ADMIN_PASSWORD
+WordPress Admin URL: https://$DOMAIN_NAME/wp-admin
 Database Name: $DB_NAME
 Database User: $DB_USER
 Database Password: $DB_PASS

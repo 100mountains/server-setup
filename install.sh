@@ -134,11 +134,11 @@ log "Pre-flight checks passed"
 # Run scripts in order
 log "=== Starting server installation ==="
 
-# Step 1: Security hardening (must be first)
-run_script "harden.sh" "Security hardening (SSH, firewall, fail2ban)"
-
-# Step 2: LEMP stack and WordPress installation
+# Step 1: LEMP stack and WordPress installation
 run_script "install-wordpress.sh" "LEMP stack and WordPress installation"
+
+# Step 2: Security hardening (must be first)
+run_script "harden.sh" "Security hardening (SSH, firewall, fail2ban)"
 
 # Step 3: Music store plugins (depends on WordPress)
 run_script "install-music-store-plugins.sh" "Music store plugins installation"
