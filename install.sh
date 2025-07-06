@@ -45,6 +45,12 @@ fi
 if [[ -z "${EMAIL:-}" ]]; then
     echo "Email not found in .env file or environment."
     read -p "Enter your admin email: " EMAIL
+
+# Create .env file with the values for child scripts
+echo "DOMAIN_NAME="$DOMAIN_NAME"" > .env
+echo "EMAIL="$EMAIL"" >> .env
+log "Created .env file with domain and email configuration"
+source .env
 fi
 
 
@@ -56,6 +62,12 @@ fi
 
 if [[ -z "$EMAIL" ]]; then
     read -p "Enter your admin email: " EMAIL
+
+# Create .env file with the values for child scripts
+echo "DOMAIN_NAME="$DOMAIN_NAME"" > .env
+echo "EMAIL="$EMAIL"" >> .env
+log "Created .env file with domain and email configuration"
+source .env
 fi
 
 log "Starting server setup for domain: $DOMAIN_NAME"

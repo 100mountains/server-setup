@@ -47,7 +47,7 @@ sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/ssh_confi
 
 # Test SSH config before restarting
 echo "Testing SSH configuration..."
-if ssh -t; then
+if sshd -t; then
     echo "SSH config is valid, restarting service..."
     systemctl restart ssh || echo "Warning: Failed to restart SSH service, continuing..."
     if systemctl is-active --quiet ssh; then
