@@ -173,24 +173,15 @@ systemctl restart mariadb
 
 # Save credentials
 cat > /root/wordpress-credentials.txt << EOF
-=========================
-WordPress Audio Site Installation Details
-=========================
-WordPress Admin User: admin
-WordPress Admin Password: $WP_ADMIN_PASSWORD
-WordPress Admin URL: https://$DOMAIN_NAME/wp-admin
-Database Name: $DB_NAME
-Database User: $DB_USER
-Database Password: $DB_PASS
-MySQL Root Password: $MYSQL_ROOT_PASS
-=========================
-Performance Configuration:
-- PHP Memory: 8GB (from templates)
-- WP Memory: 512MB (max 8GB)
-- MariaDB Buffer: 8GB
-- Max upload size: 2GB
-- Execution time: 1 hour
-=========================
+WP_ADMIN_USER="admin"
+WP_ADMIN_PASSWORD="$WP_ADMIN_PASSWORD"
+DOMAIN_URL="https://$DOMAIN_NAME/wp-admin"
+DOMAIN="$DOMAIN_NAME"
+EMAIL="$EMAIL"
+DB_NAME="$DB_NAME"
+DB_USER="$DB_USER"
+DB_PASS="$DB_PASS"
+MYSQL_ROOT_PASS="$MYSQL_ROOT_PASS"
 EOF
 
 chmod 600 /root/wordpress-credentials.txt
@@ -200,6 +191,9 @@ echo "=========================="
 echo "WordPress NGINX Installation Complete!"
 echo "Optimized for 32GB RAM Server"
 echo "=========================="
+echo "WordPress Admin User: admin"
+echo "WordPress Admin Password: $WP_ADMIN_PASSWORD"
+echo "WordPress Admin URL: https://$DOMAIN_NAME/wp-admin"
 echo "Database Name: $DB_NAME"
 echo "Database User: $DB_USER"
 echo "Database Password: $DB_PASS"
@@ -210,10 +204,6 @@ echo "Visit https://$DOMAIN_NAME to complete setup"
 echo ""
 echo "Theme: Bandfront child theme activated"
 echo ""
-echo "Consider installing these plugins for audio handling:"
-echo "- WooCommerce (for selling)"
-echo "- WP Offload Media (for S3/CDN storage)"
-echo "- Seriously Simple Podcasting (for streaming)"
 
 # Install and activate the Bandfront child theme
 echo "Installing Bandfront child theme..."

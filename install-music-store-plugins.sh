@@ -15,16 +15,11 @@ if [ ! -f "/var/www/html/wp-config.php" ]; then
     exit 1
 fi
 
-# Load environment variables from .env file
-if [ -f .env ]; then
-  set -a  # automatically export all variables
-  source .env
-  set +a  # disable automatic export
-fi
-
-# Check for required env variables
-if [ -z "$DOMAIN_NAME" ] || [ -z "$EMAIL" ]; then
-    echo "Error: DOMAIN_NAME and EMAIL must be set in .env file"
+# Read WordPress credentials
+if [ -f /root/wordpress_credentials.txt ]; then
+    source /root/wordpress_credentials.txt
+else
+    echo "Error: WordPress credentials file not found"
     exit 1
 fi
 
