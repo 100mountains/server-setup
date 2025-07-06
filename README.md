@@ -6,8 +6,6 @@ This repository contains server setup scripts for a media serving WordPress inst
 
 - `install-wordpress.sh`: Automates the process of installing and configuring WordPress on a server.
 - `harden.sh`: Security hardening script that configures UFW firewall, fail2ban, and SSH security settings.
-- `nginx-wordpress.template`: Nginx configuration template with optimized settings for media serving and WooCommerce.
-- `wp-config.template.php`: WordPress configuration template with optimized memory and performance settings.
 
 ## Security Hardening Script
 
