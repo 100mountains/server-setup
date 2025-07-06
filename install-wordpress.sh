@@ -47,6 +47,14 @@ apt install -y sshfs
 systemctl enable nginx mariadb php8.3-fpm
 systemctl start nginx mariadb php8.3-fpm
 
+# Configure systemd service dependencies for proper boot order
+echo "Configuring systemd service dependencies..."
+mkdir -p /etc/systemd/system/nginx.service.d
+mkdir -p /etc/systemd/system/php8.3-fpm.service.d
+cp "$SCRIPT_DIR/configs/systemd/overrides/nginx-mariadb-dependency.conf" /etc/systemd/system/nginx.service.d/mariadb-dependency.conf
+cp "$SCRIPT_DIR/configs/systemd/overrides/php-fpm-mariadb-dependency.conf" /etc/systemd/system/php8.3-fpm.service.d/mariadb-dependency.conf
+systemctl daemon-reload
+
 # Secure MySQL and set root password
 mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASS';"
 mysql -u root -p"$MYSQL_ROOT_PASS" -e "DELETE FROM mysql.user WHERE User='';"
