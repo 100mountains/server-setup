@@ -1,24 +1,88 @@
 [PHP]
+; Core Engine Settings
+engine = On
+expose_php = Off
+default_charset = "UTF-8"
+default_mimetype = "text/html"
+
+; Resource Limits
 max_execution_time = 3600
 max_input_time = 3600
 max_input_vars = 10000
 memory_limit = 8G
-post_max_size = 2G
+
+; File Uploads
+file_uploads = On
 upload_max_filesize = 2G
+post_max_size = 2G
 max_file_uploads = 20
-expose_php = Off
+
+; Error Handling
 display_errors = Off
+display_startup_errors = Off
 log_errors = On
 error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+ignore_repeated_errors = Off
+ignore_repeated_source = Off
+report_memleaks = On
+
+; URL and File Handling
+allow_url_fopen = On
+allow_url_include = Off
+auto_prepend_file =
+auto_append_file =
+default_socket_timeout = 60
+
+; Output Control
+output_buffering = 4096
+implicit_flush = Off
+
+; Language Options
+short_open_tag = Off
+auto_globals_jit = On
+variables_order = "GPCS"
+request_order = "GP"
+register_argc_argv = Off
+
+; Misc
+serialize_precision = -1
+disable_functions = 
+disable_classes =
+enable_dl = Off
+user_dir =
+doc_root =
+unserialize_callback_func =
+
+; Precision
+precision = 14
+bcmath.scale = 0
+
+; Zend Engine
+zend.assertions = -1
 
 [Session]
-session.gc_maxlifetime = 1440
 session.save_handler = files
 session.use_strict_mode = 0
 session.use_cookies = 1
 session.use_only_cookies = 1
 session.cookie_httponly = 1
 session.cookie_samesite = "Lax"
+session.gc_maxlifetime = 1440
+session.gc_probability = 0
+session.gc_divisor = 1000
+session.cache_limiter = nocache
+session.cache_expire = 180
+session.name = PHPSESSID
+session.auto_start = 0
+session.cookie_lifetime = 0
+session.cookie_path = /
+session.cookie_domain =
+session.serialize_handler = php
+session.sid_length = 26
+session.sid_bits_per_character = 5
+session.use_trans_sid = 0
+session.trans_sid_tags = "a=href,area=href,frame=src,form="
+session.referer_check =
 
 [opcache]
 opcache.enable=1
@@ -38,6 +102,14 @@ mysql.max_links = -1
 mysqli.max_persistent = -1
 mysqli.allow_persistent = On
 mysqli.max_links = -1
+mysqli.default_host =
+mysqli.default_port = 3306
+mysqli.default_user =
+mysqli.default_pw =
+mysqli.default_socket =
+
+[PDO_MySQL]
+pdo_mysql.default_socket=
 
 [mail function]
 SMTP = localhost

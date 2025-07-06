@@ -1,0 +1,45 @@
+[PHP]
+max_execution_time = 3600
+max_input_time = 3600
+max_input_vars = 10000
+memory_limit = 8G
+post_max_size = 2G
+upload_max_filesize = 2G
+max_file_uploads = 20
+expose_php = Off
+display_errors = Off
+log_errors = On
+error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+
+[Session]
+session.gc_maxlifetime = 1440
+session.save_handler = files
+session.use_strict_mode = 0
+session.use_cookies = 1
+session.use_only_cookies = 1
+session.cookie_httponly = 1
+session.cookie_samesite = "Lax"
+
+[opcache]
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=10000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=2
+opcache.fast_shutdown=1
+
+[mysql]
+mysql.allow_persistent = On
+mysql.max_persistent = -1
+mysql.max_links = -1
+
+[MySQLi]
+mysqli.max_persistent = -1
+mysqli.allow_persistent = On
+mysqli.max_links = -1
+
+[mail function]
+SMTP = localhost
+smtp_port = 25
+mail.add_x_header = Off
