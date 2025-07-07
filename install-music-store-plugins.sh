@@ -80,7 +80,7 @@ install_plugin "WooCommerce PayPal Payments" "woocommerce-paypal-payments"
 install_plugin "Theme My Login" "theme-my-login"
 
 # Install WP Armour - Honeypot Anti Spam (correct slug)
-install_plugin "WP Armour - Honeypot Anti Spam" "honeypot-anti-spam"
+install_plugin "WP Armour - Honeypot Anti Spam" "honeypot"
 
 # Remove WooCommerce Tax - this is a premium plugin, not available in free repo
 # install_plugin "WooCommerce Tax" "woocommerce-tax"
