@@ -148,18 +148,18 @@ chmod -R 755 /var/www/.wp-cli
 # Complete WordPress core installation
 echo "Completing WordPress core installation..."
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12)
-sudo -u www-data wp --path=/var/www/html core install \
+if sudo -u www-data wp --path=/var/www/html core install \
     --url="https://$DOMAIN_NAME" \
     --title="$DOMAIN_NAME" \
     --admin_user="admin" \
     --admin_password="$WP_ADMIN_PASSWORD" \
     --admin_email="$EMAIL" \
-    --skip-email
-
-echo "WordPress core installation complete!"
-echo "Admin credentials generated successfully"
-
-# Set up real cron for WordPress
+    --skip-email; then
+    echo "WordPress core installation complete!"
+else
+    echo "Error: WordPress core installation failed!"
+    exit 1
+fi
 
 # Set up real cron for WordPress
 echo "*/5 * * * * www-data php /var/www/html/wp-cron.php > /dev/null 2>&1" > /etc/cron.d/wordpress
@@ -169,7 +169,26 @@ mkdir -p /var/www/html/wp-content/uploads
 chown -R www-data:www-data /var/www/html/wp-content/uploads
 chmod -R 755 /var/www/html/wp-content/uploads
 
+# Install and activate the Bandfront child theme
+echo "Installing Bandfront child theme..."
 
+# Copy the Bandfront theme to WordPress themes directory with correct name
+cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/bandfront
+
+# Set proper permissions for the theme
+chown -R www-data:www-data /var/www/html/wp-content/themes/bandfront
+find /var/www/html/wp-content/themes/bandfront -type d -exec chmod 755 {} \;
+find /var/www/html/wp-content/themes/bandfront -type f -exec chmod 644 {} \;
+
+# Install parent theme (Storefront) first
+echo "Installing Storefront parent theme..."
+sudo -u www-data wp --path=/var/www/html theme install storefront
+
+# Activate the Bandfront theme using the Theme Name from style.css
+echo "Activating bandfront theme..."
+sudo -u www-data wp --path=/var/www/html theme activate "bandfront"
+
+echo "Bandfront theme installation complete!"
 
 # Apply MariaDB configuration template
 echo "Applying MariaDB configuration template..."
@@ -209,27 +228,6 @@ echo "Visit https://$DOMAIN_NAME to complete setup"
 echo ""
 echo "Theme: Bandfront child theme activated"
 echo ""
-
-# Install and activate the Bandfront child theme
-echo "Installing Bandfront child theme..."
-
-# Copy the Bandfront theme to WordPress themes directory
-cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/storefront-child
-
-# Set proper permissions for the theme
-chown -R www-data:www-data /var/www/html/wp-content/themes/storefront-child
-find /var/www/html/wp-content/themes/storefront-child -type d -exec chmod 755 {} \;
-find /var/www/html/wp-content/themes/storefront-child -type f -exec chmod 644 {} \;
-
-# Install parent theme (Storefront) via WP-CLI
-echo "Installing Storefront parent theme..."
-sudo -u www-data wp --path=/var/www/html theme install storefront --activate
-
-# Activate the Storefront Child theme
-echo "Activating Bandfront theme..."
-sudo -u www-data wp --path=/var/www/html theme activate storefront-child
-
-echo "Storefront Child theme installation complete!"
 
 # Fix debian-start script access
 echo "Configuring MariaDB debian-start script..."

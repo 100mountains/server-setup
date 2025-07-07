@@ -80,7 +80,7 @@ install_plugin "WooCommerce PayPal Payments" "woocommerce-paypal-payments"
 install_plugin "Theme My Login" "theme-my-login"
 
 # Install WP Armour - Honeypot Anti Spam (correct slug)
-install_plugin "WP Armour - Honeypot Anti Spam" "honeypot"
+install_plugin "WP Armour - Honeypot Anti Spam" "honeypot-anti-spam"
 
 # Remove WooCommerce Tax - this is a premium plugin, not available in free repo
 # install_plugin "WooCommerce Tax" "woocommerce-tax"
@@ -120,12 +120,12 @@ echo "Configuring Theme My Login..."
 sudo -u www-data wp --path=/var/www/html option update theme_my_login_enable "1"
 sudo -u www-data wp --path=/var/www/html option update theme_my_login_redirect_to_referer "1"
 
-# Configure WP Armour Anti-Spam
-
 # Configure MailPoet
 echo "Configuring MailPoet..."
 sudo -u www-data wp --path=/var/www/html option update mailpoet_analytics_enabled "0"
 sudo -u www-data wp --path=/var/www/html option update mailpoet_premium_key ""
+
+# Configure WP Armour Anti-Spam
 echo "Configuring WP Armour Anti-Spam..."
 sudo -u www-data wp --path=/var/www/html option update wp_armour_enable "1"
 sudo -u www-data wp --path=/var/www/html option update wp_armour_honeypot_enable "1"
@@ -137,14 +137,6 @@ echo "Creating necessary directories..."
 mkdir -p /var/www/html/wp-content/uploads/woocommerce_uploads
 chown -R www-data:www-data /var/www/html/wp-content/uploads/woocommerce_uploads
 chmod -R 755 /var/www/html/wp-content/uploads/woocommerce_uploads
-
-# Create music/audio specific directories
-mkdir -p /var/www/html/wp-content/uploads/music
-mkdir -p /var/www/html/wp-content/uploads/audio-previews
-chown -R www-data:www-data /var/www/html/wp-content/uploads/music
-chown -R www-data:www-data /var/www/html/wp-content/uploads/audio-previews
-chmod -R 755 /var/www/html/wp-content/uploads/music
-chmod -R 755 /var/www/html/wp-content/uploads/audio-previews
 
 # Set proper permissions for all plugins
 echo "Setting proper permissions..."
@@ -159,14 +151,12 @@ echo "Installed Plugins:"
 echo "- WooCommerce (E-commerce platform)"
 echo "- WooCommerce PayPal Payments (Payment gateway)"
 echo "- Theme My Login (Custom login experience)"
-echo "- WP Armour - Honeypot Anti Spam (Security)
-- List Category Posts (Content organization)
-- MailPoet (Email marketing)"
+echo "- WP Armour - Honeypot Anti Spam (Security)"
+echo "- List Category Posts (Content organization)"
+echo "- MailPoet (Email marketing)"
 echo ""
 echo "Created Directories:"
 echo "- /var/www/html/wp-content/uploads/woocommerce_uploads"
-echo "- /var/www/html/wp-content/uploads/music"
-echo "- /var/www/html/wp-content/uploads/audio-previews"
 echo ""
 echo "Next Steps:"
 echo "1. Visit https://$DOMAIN_NAME/wp-admin to complete WordPress setup"
@@ -176,8 +166,3 @@ echo "4. Set up Theme My Login pages and styling"
 echo "5. Configure tax settings for your location"
 echo "6. Add your music products with downloadable files"
 echo ""
-echo "Additional recommended plugins:"
-echo "- WP Offload Media (for large audio files & CDN)"
-echo "- Audio Player plugins for music previews"
-echo "- WooCommerce Subscriptions (for recurring sales)"
-echo "- WooCommerce Bookings (for live events/sessions)"

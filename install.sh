@@ -56,8 +56,6 @@ log "Created .env file with domain and email configuration"
 source .env
 fi
 
-
-
 # If no domain provided, prompt for it
 if [[ -z "$DOMAIN_NAME" ]]; then
     read -p "Enter your domain name: " DOMAIN_NAME
@@ -88,6 +86,7 @@ run_script() {
         exit 1
     fi
     
+    # Missing: actual script execution and error handling
     if ! bash "$script_name"; then
         error "Script $script_name failed!"
         exit 1

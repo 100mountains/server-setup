@@ -134,13 +134,6 @@ else
     echo "Warning: nginx-botsearch filter not found at $CONFIG_DIR/fail2ban/nginx-botsearch.conf"
 fi
 
-if [ -f "$CONFIG_DIR/fail2ban/sshd.local" ]; then
-    cp "$CONFIG_DIR/fail2ban/sshd.local" /etc/fail2ban/jail.d/sshd.local || echo "Warning: Failed to copy sshd.local, continuing..."
-    echo "sshd.local configuration copied successfully"
-else
-    echo "Warning: sshd.local config file not found at $CONFIG_DIR/fail2ban/sshd.local"
-fi
-
 # Enable and start Fail2Ban
 echo "Starting and enabling fail2ban service..."
 systemctl enable fail2ban || echo "Warning: Failed to enable Fail2Ban, continuing..."
