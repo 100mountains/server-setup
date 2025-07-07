@@ -172,7 +172,13 @@ chmod -R 755 /var/www/html/wp-content/uploads
 # Install and activate the Bandfront child theme
 echo "Installing Bandfront child theme..."
 
-# Copy the Bandfront theme to WordPress themes directory with correct name
+# Initialize submodules if theme files missing
+if [ ! -f "$SCRIPT_DIR/themes/bandfront/style.css" ]; then
+    echo "Initializing submodules..."
+    git submodule update --init --recursive
+fi
+
+# Copy theme files
 cp -r "$SCRIPT_DIR/themes/bandfront" /var/www/html/wp-content/themes/bandfront
 
 # Set proper permissions for the theme
