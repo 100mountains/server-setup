@@ -175,7 +175,13 @@ echo "Installing Bandfront child theme..."
 # Initialize submodules if theme files missing
 if [ ! -f "$SCRIPT_DIR/themes/bandfront/style.css" ]; then
     echo "Initializing submodules..."
-    git submodule update --init --recursive
+    (
+      cd "$SCRIPT_DIR" || exit 1
+      git submodule update --init --recursive || {
+        echo "Warning: Could not update submodules (not a Git repo?)"
+        exit 1
+      }
+    )
 fi
 
 # Copy theme files

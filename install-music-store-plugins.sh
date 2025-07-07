@@ -130,6 +130,12 @@ echo "Configuring WP Armour Anti-Spam..."
 sudo -u www-data wp --path=/var/www/html option update wp_armour_enable "1"
 sudo -u www-data wp --path=/var/www/html option update wp_armour_honeypot_enable "1"
 
+# Install Bandfront Player plugin
+echo "Installing Bandfront Player plugin..."
+sudo -u www-data wp --path=/var/www/html plugin install \
+  https://github.com/100mountains/bandfront-player/archive/refs/heads/main.zip \
+  --activate
+
 # Create necessary directories
 echo "Creating necessary directories..."
 
