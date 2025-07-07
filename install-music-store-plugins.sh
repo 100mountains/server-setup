@@ -79,11 +79,11 @@ install_plugin "WooCommerce PayPal Payments" "woocommerce-paypal-payments"
 # Install Theme My Login (Custom login experience)
 install_plugin "Theme My Login" "theme-my-login"
 
-# Install WP Armour - Honeypot Anti Spam
-install_plugin "WP Armour - Honeypot Anti Spam" "wp-armour"
+# Install WP Armour - Honeypot Anti Spam (correct slug)
+install_plugin "WP Armour - Honeypot Anti Spam" "honeypot"
 
-# Install WooCommerce Tax
-install_plugin "WooCommerce Tax" "woocommerce-tax"
+# Remove WooCommerce Tax - this is a premium plugin, not available in free repo
+# install_plugin "WooCommerce Tax" "woocommerce-tax"
 
 # Install List Category Posts (content organization)
 install_plugin "List Category Posts" "list-category-posts"
@@ -160,10 +160,8 @@ echo "- WooCommerce (E-commerce platform)"
 echo "- WooCommerce PayPal Payments (Payment gateway)"
 echo "- Theme My Login (Custom login experience)"
 echo "- WP Armour - Honeypot Anti Spam (Security)
-- WooCommerce Tax (Automated tax calculation)
 - List Category Posts (Content organization)
 - MailPoet (Email marketing)"
-echo "- WooCommerce Tax (Automated tax calculation)"
 echo ""
 echo "Created Directories:"
 echo "- /var/www/html/wp-content/uploads/woocommerce_uploads"

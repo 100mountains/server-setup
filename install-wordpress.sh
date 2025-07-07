@@ -140,6 +140,11 @@ curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.pha
 chmod +x wp-cli.phar
 mv wp-cli.phar /usr/local/bin/wp
 
+# Create WP-CLI cache directory with proper permissions
+mkdir -p /var/www/.wp-cli/cache
+chown -R www-data:www-data /var/www/.wp-cli
+chmod -R 755 /var/www/.wp-cli
+
 # Complete WordPress core installation
 echo "Completing WordPress core installation..."
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12)
@@ -176,7 +181,7 @@ cat > /root/wordpress-credentials.txt << EOF
 WP_ADMIN_USER="admin"
 WP_ADMIN_PASSWORD="$WP_ADMIN_PASSWORD"
 DOMAIN_URL="https://$DOMAIN_NAME/wp-admin"
-DOMAIN="$DOMAIN_NAME"
+DOMAIN_NAME="$DOMAIN_NAME"
 EMAIL="$EMAIL"
 DB_NAME="$DB_NAME"
 DB_USER="$DB_USER"
@@ -225,3 +230,19 @@ echo "Activating Bandfront theme..."
 sudo -u www-data wp --path=/var/www/html theme activate storefront-child
 
 echo "Storefront Child theme installation complete!"
+
+# Fix debian-start script access
+echo "Configuring MariaDB debian-start script..."
+cat > /etc/mysql/debian.cnf << EOF
+[client]
+host     = localhost
+user     = root
+password = $MYSQL_ROOT_PASS
+socket   = /run/mysqld/mysqld.sock
+[mysql_upgrade]
+host     = localhost
+user     = root
+password = $MYSQL_ROOT_PASS
+socket   = /run/mysqld/mysqld.sock
+EOF
+chmod 600 /etc/mysql/debian.cnf
