@@ -1,33 +1,107 @@
 #!/bin/bash
 
-# Compare installed configurations with expected configs
+# Comprehensive Server Installation Comparison and Monitoring Script
+# Validates configurations, monitors system health, and checks WordPress functionality
 
 set -euo pipefail
+
+# =============================================================================
+# CONFIGURATION AND GLOBALS
+# =============================================================================
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Monitoring thresholds
+CPU_THRESHOLD=80
+MEMORY_THRESHOLD=85
+DISK_THRESHOLD=85
+LOAD_THRESHOLD=4.0
+
+# Counters for summary
+TOTAL_CHECKS=0
+PASSED_CHECKS=0
+FAILED_CHECKS=0
+WARNING_CHECKS=0
+
+# Paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_BASE_DIR="$(dirname "$SCRIPT_DIR")/configs"
+LOG_FILE="./server-monitor.log"
+WP_PATH="/var/www/html"
+WP_CONFIG="$WP_PATH/wp-config.php"
+UPLOAD_DIR="$WP_PATH/wp-content/uploads"
+WOO_DIR="$WP_PATH/wp-content/uploads/woocommerce_uploads"
+
+# =============================================================================
+# LOGGING AND UTILITY FUNCTIONS
+# =============================================================================
+
+log_entry() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE" 2>/dev/null || true
+}
 
 log() {
     echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
+    log_entry "INFO: $1"
 }
 
 error() {
     echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1"
+    log_entry "ERROR: $1"
+    ((FAILED_CHECKS++))
 }
 
 warning() {
     echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING:${NC} $1"
+    log_entry "WARNING: $1"
+    ((WARNING_CHECKS++))
 }
 
-log "Comparing installed configurations..."
+success() {
+    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS:${NC} $1"
+    log_entry "SUCCESS: $1"
+    ((PASSED_CHECKS++))
+}
 
-# Function to compare config files
+info() {
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] INFO:${NC} $1"
+}
+
+alert() {
+    echo -e "${RED}🚨 ALERT: $1${NC}"
+    log_entry "ALERT: $1"
+}
+
+# =============================================================================
+# WORDPRESS DATABASE HELPER FUNCTIONS
+# =============================================================================
+
+get_wp_db_creds() {
+    if [[ -f "$WP_CONFIG" ]]; then
+        DB_NAME=$(grep "DB_NAME" "$WP_CONFIG" | cut -d "'" -f 4 || true)
+        DB_USER=$(grep "DB_USER" "$WP_CONFIG" | cut -d "'" -f 4 || true)
+        DB_PASS=$(grep "DB_PASSWORD" "$WP_CONFIG" | cut -d "'" -f 4 || true)
+        DB_HOST=$(grep "DB_HOST" "$WP_CONFIG" | cut -d "'" -f 4 || true)
+    fi
+}
+
+# =============================================================================
+# CONFIGURATION COMPARISON FUNCTIONS
+# =============================================================================
+
+# Compare actual config files with expected templates
 compare_config() {
     local expected_file="$1"
     local actual_file="$2"
     local description="$3"
+    
+    ((TOTAL_CHECKS++))
+    echo "=== $description ==="
     
     if [[ ! -f "$expected_file" ]]; then
         error "Expected config file not found: $expected_file"
@@ -39,30 +113,615 @@ compare_config() {
         return 1
     fi
     
-    echo "=== $description ==="
-    if diff -u "$expected_file" "$actual_file"; then
-        log "$description: MATCH"
+    if diff_output=$(diff -u "$expected_file" "$actual_file" 2>&1); then
+        success "$description: MATCH"
     else
         warning "$description: DIFFERENCES FOUND"
+        echo -e "${YELLOW}First 10 lines of differences:${NC}"
+        echo "$diff_output" | head -10
+        echo -e "${YELLOW}(Full diff: diff -u $expected_file $actual_file)${NC}"
     fi
     echo
 }
 
-# Compare key configuration files
-compare_config "configs/nginx/nginx.conf" "/etc/nginx/nginx.conf" "Nginx main config"
-compare_config "configs/php/php.ini" "/etc/php/8.3/fpm/php.ini" "PHP configuration"
-compare_config "configs/php/www.conf" "/etc/php/8.3/fpm/pool.d/www.conf" "PHP-FPM pool config"
-compare_config "configs/mariadb/60-optimizations.cnf" "/etc/mysql/mariadb.conf.d/60-optimizations.cnf" "MariaDB optimizations"
-
-# Check if services are running
-log "Checking service status..."
-services=("nginx" "mariadb" "php8.3-fpm" "fail2ban")
-for service in "${services[@]}"; do
-    if systemctl is-active --quiet "$service"; then
-        log "$service: RUNNING"
-    else
-        error "$service: NOT RUNNING"
+# Check if template files were properly processed (no unreplaced placeholders)
+compare_template() {
+    local template_file="$1"
+    local actual_file="$2"
+    local description="$3"
+    
+    ((TOTAL_CHECKS++))
+    echo "=== $description (Template Check) ==="
+    
+    if [[ ! -f "$template_file" ]]; then
+        error "Template file not found: $template_file"
+        return 1
     fi
-done
+    
+    if [[ ! -f "$actual_file" ]]; then
+        error "Actual config file not found: $actual_file"
+        return 1
+    fi
+    
+    local unreplaced_vars=$(grep -o "%%.*%%" "$actual_file" 2>/dev/null || true)
+    if [[ -n "$unreplaced_vars" ]]; then
+        warning "$description: Contains unreplaced template placeholders"
+        echo -e "${YELLOW}Unreplaced variables:${NC}"
+        echo "$unreplaced_vars" | head -3
+    else
+        success "$description: Template properly processed"
+    fi
+    echo
+}
 
-log "Configuration comparison complete!"
+# Check file permissions and ownership
+check_file_perms() {
+    local file_path="$1"
+    local expected_owner="$2"
+    local expected_perms="$3"
+    local description="$4"
+    
+    ((TOTAL_CHECKS++))
+    
+    if [[ ! -f "$file_path" && ! -d "$file_path" ]]; then
+        error "$description: File/directory not found: $file_path"
+        return 1
+    fi
+    
+    local actual_owner=$(stat -c "%U:%G" "$file_path")
+    local actual_perms=$(stat -c "%a" "$file_path")
+    
+    if [[ "$actual_owner" == "$expected_owner" && "$actual_perms" == "$expected_perms" ]]; then
+        success "$description: Correct permissions ($actual_perms) and ownership ($actual_owner)"
+    else
+        warning "$description: Permissions/ownership mismatch"
+        echo "  Expected: $expected_perms $expected_owner"
+        echo "  Actual:   $actual_perms $actual_owner"
+    fi
+}
+
+# =============================================================================
+# SYSTEM RESOURCE MONITORING FUNCTIONS
+# =============================================================================
+
+check_system_resources() {
+    echo -e "${CYAN}=== SYSTEM RESOURCES ===${NC}"
+    
+    # CPU usage
+    CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//' | sed 's/%//')
+    echo "CPU Usage: ${CPU_USAGE}%"
+    if (( $(echo "$CPU_USAGE > $CPU_THRESHOLD" | bc -l 2>/dev/null || echo "0") )); then
+        alert "High CPU usage: ${CPU_USAGE}%"
+    fi
+    
+    # Memory usage
+    MEMORY_INFO=$(free | grep Mem)
+    TOTAL_MEM=$(echo "$MEMORY_INFO" | awk '{print $2}')
+    USED_MEM=$(echo "$MEMORY_INFO" | awk '{print $3}')
+    MEMORY_PERCENT=$(( (USED_MEM * 100) / TOTAL_MEM ))
+    echo "Memory Usage: ${USED_MEM}/${TOTAL_MEM} (${MEMORY_PERCENT}%)"
+    if [[ $MEMORY_PERCENT -gt $MEMORY_THRESHOLD ]]; then
+        alert "High memory usage: ${MEMORY_PERCENT}%"
+    fi
+    
+    # Load average
+    LOAD_AVG=$(uptime | awk '{print $(NF-2)}' | sed 's/,//')
+    echo "Load Average (1min): $LOAD_AVG"
+    if (( $(echo "$LOAD_AVG > $LOAD_THRESHOLD" | bc -l 2>/dev/null || echo "0") )); then
+        alert "High system load: $LOAD_AVG"
+    fi
+    
+    # Disk usage
+    echo -e "${BLUE}Disk Usage:${NC}"
+    df -h | grep -E "/$|/var|/tmp" | while read filesystem size used avail percent mount; do
+        percent_num=$(echo "$percent" | sed 's/%//')
+        echo "$mount: $used/$size ($percent)"
+        if [[ $percent_num -gt $DISK_THRESHOLD ]]; then
+            alert "High disk usage on $mount: $percent"
+        fi
+    done
+    
+    # Process count
+    PROCESS_COUNT=$(ps aux | wc -l)
+    echo "Running processes: $PROCESS_COUNT"
+    echo
+}
+
+# =============================================================================
+# SERVICE HEALTH AND FUNCTIONALITY TESTS
+# =============================================================================
+
+test_service_functionality() {
+    local service_name="$1"
+    local test_command="$2"
+    local description="$3"
+    
+    ((TOTAL_CHECKS++))
+    
+    if systemctl is-active --quiet "$service_name"; then
+        if eval "$test_command" >/dev/null 2>&1; then
+            success "$description: Service running and functional"
+        else
+            warning "$description: Service running but test failed"
+            info "Test command: $test_command"
+        fi
+    else
+        error "$description: Service not running"
+    fi
+}
+
+check_service_health() {
+    echo -e "${CYAN}=== SERVICE HEALTH ===${NC}"
+    
+    services=("nginx" "mariadb" "php8.3-fpm" "fail2ban")
+    
+    for service in "${services[@]}"; do
+        ((TOTAL_CHECKS++))
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            case $service in
+                "nginx")
+                    if curl -s -o /dev/null -w "%{http_code}" "http://localhost" | grep -q "200\|301\|302"; then
+                        success "$service: Running and responsive"
+                    else
+                        warning "$service: Running but not responding to HTTP requests"
+                    fi
+                    ;;
+                "mariadb")
+                    if mysql -e "SELECT 1;" >/dev/null 2>&1; then
+                        success "$service: Running and responsive"
+                    else
+                        warning "$service: Running but not accepting connections"
+                    fi
+                    ;;
+                "php8.3-fpm")
+                    PHP_WORKERS=$(pgrep -f "php-fpm" | wc -l)
+                    if [[ $PHP_WORKERS -gt 0 ]]; then
+                        success "$service: Running with $PHP_WORKERS worker processes"
+                    else
+                        warning "$service: Running but no worker processes found"
+                    fi
+                    ;;
+                "fail2ban")
+                    if fail2ban-client status >/dev/null 2>&1; then
+                        JAIL_COUNT=$(fail2ban-client status 2>/dev/null | grep "Jail list" | cut -d: -f2 | tr ',' '\n' | wc -l)
+                        success "$service: Running with $JAIL_COUNT active jails"
+                    else
+                        warning "$service: Running but not responsive"
+                    fi
+                    ;;
+            esac
+        else
+            error "$service: NOT RUNNING"
+        fi
+    done
+    echo
+}
+
+# =============================================================================
+# SECURITY MONITORING FUNCTIONS
+# =============================================================================
+
+check_security_status() {
+    echo -e "${CYAN}=== SECURITY STATUS ===${NC}"
+    
+    # Fail2ban status and recent bans
+    if systemctl is-active --quiet fail2ban; then
+        echo -e "${BLUE}Fail2ban Status:${NC}"
+        fail2ban-client status 2>/dev/null | head -5 || true
+        
+        # Recent bans
+        RECENT_BANS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | wc -l || echo "0")
+        if [[ $RECENT_BANS -gt 0 ]]; then
+            warning "Recent bans today: $RECENT_BANS"
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | tail -3 || true
+        else
+            success "No bans today"
+        fi
+    fi
+    
+    # SSH login attempts
+    FAILED_SSH=$(grep "$(date '+%b %e')" /var/log/auth.log 2>/dev/null | grep -i "failed\|invalid" | wc -l || echo "0")
+    if [[ $FAILED_SSH -gt 10 ]]; then
+        warning "High failed SSH attempts today: $FAILED_SSH"
+    else
+        echo "Failed SSH attempts today: $FAILED_SSH"
+    fi
+    
+    # UFW firewall status
+    ((TOTAL_CHECKS++))
+    if command -v ufw >/dev/null 2>&1; then
+        if ufw status | grep -q "Status: active"; then
+            success "UFW: ACTIVE"
+            
+            # Check for required ports
+            ((TOTAL_CHECKS++))
+            if ufw status numbered | grep -E "(22|80|443)" >/dev/null; then
+                success "UFW: Standard ports configured"
+            else
+                warning "UFW: Standard ports (22,80,443) not found in rules"
+            fi
+        else
+            error "UFW: INACTIVE"
+        fi
+    else
+        warning "UFW: NOT INSTALLED"
+    fi
+    echo
+}
+
+# =============================================================================
+# SSL CERTIFICATE MONITORING FUNCTIONS
+# =============================================================================
+
+check_ssl_certificates() {
+    echo -e "${CYAN}=== SSL CERTIFICATES ===${NC}"
+    
+    ((TOTAL_CHECKS++))
+    if [[ -d "/etc/letsencrypt/live" ]]; then
+        CERT_COUNT=$(find /etc/letsencrypt/live -name "cert.pem" | wc -l)
+        if [[ $CERT_COUNT -gt 0 ]]; then
+            success "SSL certificates: $CERT_COUNT found"
+            
+            for cert_dir in /etc/letsencrypt/live/*/; do
+                if [[ -d "$cert_dir" && -f "$cert_dir/cert.pem" ]]; then
+                    ((TOTAL_CHECKS++))
+                    domain=$(basename "$cert_dir")
+                    
+                    if openssl x509 -in "$cert_dir/cert.pem" -noout -checkend 2592000 >/dev/null 2>&1; then
+                        EXPIRE_DATE=$(openssl x509 -in "$cert_dir/cert.pem" -noout -enddate | cut -d= -f2)
+                        success "SSL for $domain: Valid (expires: $EXPIRE_DATE)"
+                    else
+                        DAYS_LEFT=$(( ($(date -d "$(openssl x509 -in "$cert_dir/cert.pem" -noout -enddate | cut -d= -f2)" +%s) - $(date +%s)) / 86400 ))
+                        if [[ $DAYS_LEFT -lt 7 ]]; then
+                            alert "SSL for $domain: Certificate expires in $DAYS_LEFT days!"
+                        else
+                            warning "SSL for $domain: Certificate expires in $DAYS_LEFT days"
+                        fi
+                    fi
+                fi
+            done
+        else
+            warning "SSL certificates: NONE FOUND"
+        fi
+    else
+        warning "Let's Encrypt directory: NOT FOUND"
+    fi
+    echo
+}
+
+# =============================================================================
+# WORDPRESS MONITORING FUNCTIONS
+# =============================================================================
+
+check_wordpress_status() {
+    echo -e "${CYAN}=== WORDPRESS STATUS ===${NC}"
+    
+    # WordPress configuration test
+    ((TOTAL_CHECKS++))
+    if [[ -f "$WP_CONFIG" ]]; then
+        if php -f "$WP_CONFIG" >/dev/null 2>&1; then
+            success "WordPress configuration: Syntax valid"
+        else
+            error "WordPress configuration: PHP syntax error"
+        fi
+        
+        # WordPress version
+        if [[ -f "$WP_PATH/wp-includes/version.php" ]]; then
+            WP_VERSION=$(grep '$wp_version' "$WP_PATH/wp-includes/version.php" | cut -d "'" -f 2 || echo "Unknown")
+            echo "WordPress version: $WP_VERSION"
+        fi
+        
+        # Active plugins count
+        PLUGIN_COUNT=$(find "$WP_PATH/wp-content/plugins" -maxdepth 1 -type d 2>/dev/null | wc -l || echo "0")
+        echo "Installed plugins: $((PLUGIN_COUNT-1))"
+        
+        # Active theme
+        ACTIVE_THEME=$(wp --path="$WP_PATH" theme list --status=active --field=name 2>/dev/null || echo "Unknown")
+        echo "Active theme: $ACTIVE_THEME"
+        
+        # WordPress errors (last hour) - removed duplicate check
+        if [[ -f "$WP_PATH/wp-content/debug.log" ]]; then
+            WP_ERRORS=$(grep "$(date '+%Y-%m-%d %H')" "$WP_PATH/wp-content/debug.log" 2>/dev/null | wc -l || echo "0")
+            if [[ $WP_ERRORS -gt 0 ]]; then
+                warning "Recent WP errors: $WP_ERRORS"
+                tail -3 "$WP_PATH/wp-content/debug.log" 2>/dev/null || true
+            else
+                success "No recent WordPress errors"
+            fi
+        fi
+    else
+        error "WordPress configuration: File not found"
+    fi
+    echo
+}
+
+check_wordpress_database() {
+    echo -e "${CYAN}=== WORDPRESS DATABASE ===${NC}"
+    
+    get_wp_db_creds
+    
+    if [[ -n "${DB_NAME:-}" && -n "${DB_USER:-}" && -n "${DB_PASS:-}" ]]; then
+        if mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1;" >/dev/null 2>&1; then
+            success "WordPress Database: Accessible"
+            
+            # WordPress-specific DB stats
+            POST_COUNT=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_posts WHERE post_status='publish' AND post_type='post';" -s 2>/dev/null || echo "0")
+            PAGE_COUNT=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_posts WHERE post_status='publish' AND post_type='page';" -s 2>/dev/null || echo "0")
+            PRODUCT_COUNT=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_posts WHERE post_status='publish' AND post_type='product';" -s 2>/dev/null || echo "0")
+            USER_COUNT=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_users;" -s 2>/dev/null || echo "0")
+            ORDER_COUNT=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_posts WHERE post_type='shop_order';" -s 2>/dev/null || echo "0")
+            
+            echo "Posts: $POST_COUNT | Pages: $PAGE_COUNT | Products: $PRODUCT_COUNT"
+            echo "Users: $USER_COUNT | Orders: $ORDER_COUNT"
+            
+            # DB size
+            DB_SIZE=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 1) AS 'DB Size in MB' FROM information_schema.tables WHERE table_schema='$DB_NAME';" -s 2>/dev/null || echo "N/A")
+            echo "Database size: ${DB_SIZE} MB"
+        else
+            error "WordPress Database: Connection failed"
+        fi
+    else
+        error "WordPress Database: Credentials not found"
+    fi
+    echo
+}
+
+check_upload_status() {
+    echo -e "${CYAN}=== UPLOAD DIAGNOSTICS ===${NC}"
+    
+    # PHP upload settings
+    echo -e "${BLUE}PHP Upload Limits:${NC}"
+    php -r "
+    echo 'upload_max_filesize: ' . ini_get('upload_max_filesize') . PHP_EOL;
+    echo 'post_max_size: ' . ini_get('post_max_size') . PHP_EOL;
+    echo 'max_execution_time: ' . ini_get('max_execution_time') . 's' . PHP_EOL;
+    echo 'memory_limit: ' . ini_get('memory_limit') . PHP_EOL;
+    echo 'max_file_uploads: ' . ini_get('max_file_uploads') . PHP_EOL;
+    " 2>/dev/null || echo "Failed to retrieve PHP settings"
+    
+    if [[ -d "$UPLOAD_DIR" ]]; then
+        # Upload directory permissions
+        UPLOAD_PERMS=$(stat -c "%a" "$UPLOAD_DIR" 2>/dev/null || echo "N/A")
+        UPLOAD_OWNER=$(stat -c "%U:%G" "$UPLOAD_DIR" 2>/dev/null || echo "N/A")
+        echo "Upload dir permissions: $UPLOAD_PERMS ($UPLOAD_OWNER)"
+        
+        # Disk space and sizes
+        UPLOAD_SIZE=$(du -sh "$UPLOAD_DIR" 2>/dev/null | cut -f1 || echo "N/A")
+        echo "Uploads directory size: $UPLOAD_SIZE"
+        
+        # Recent upload activity
+        RECENT_UPLOADS=$(find "$UPLOAD_DIR" -type f -mmin -60 2>/dev/null | wc -l || echo "0")
+        echo "Files uploaded in last hour: $RECENT_UPLOADS"
+        
+        # Large files check
+        echo -e "${BLUE}Large Files (>100MB):${NC}"
+        LARGE_FILES=$(find "$UPLOAD_DIR" -type f -size +100M 2>/dev/null | wc -l || echo "0")
+        if [[ $LARGE_FILES -gt 0 ]]; then
+            find "$UPLOAD_DIR" -type f -size +100M -exec ls -lh {} \; 2>/dev/null | head -5 | awk '{print $5 "\t" $9}' || true
+        else
+            echo "No files >100MB found"
+        fi
+        
+        # Recent failed uploads (look for temp files)
+        TEMP_FILES=$(find "$UPLOAD_DIR" -name "*.tmp" -mtime -1 2>/dev/null | wc -l || echo "0")
+        if [[ $TEMP_FILES -gt 0 ]]; then
+            warning "Recent temp files (failed uploads): $TEMP_FILES"
+            find "$UPLOAD_DIR" -name "*.tmp" -mtime -1 2>/dev/null | head -3 || true
+        else
+            success "No recent failed uploads detected"
+        fi
+    else
+        error "Upload directory not found: $UPLOAD_DIR"
+    fi
+    echo
+}
+
+check_woocommerce_status() {
+    echo -e "${CYAN}=== WOOCOMMERCE STATUS ===${NC}"
+    
+    if [[ -d "$WP_PATH/wp-content/plugins/woocommerce" ]]; then
+        success "WooCommerce: Installed"
+        
+        get_wp_db_creds
+        if [[ -n "${DB_NAME:-}" && -n "${DB_USER:-}" && -n "${DB_PASS:-}" ]]; then
+            # Recent orders
+            RECENT_ORDERS=$(mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT COUNT(*) FROM wp_posts WHERE post_type='shop_order' AND post_date > DATE_SUB(NOW(), INTERVAL 24 HOUR);" -s 2>/dev/null || echo "0")
+            echo "Orders (24h): $RECENT_ORDERS"
+            
+            # Download attempts (check logs)
+            DOWNLOAD_LOGS=$(grep -i "download" /var/log/nginx/access.log 2>/dev/null | grep "$(date '+%d/%b/%Y')" | wc -l || echo "0")
+            echo "Download attempts today: $DOWNLOAD_LOGS"
+            
+            # WooCommerce uploads protection
+            if [[ -f "$WOO_DIR/.htaccess" ]]; then
+                success "Downloads protected"
+            else
+                warning "Downloads not protected"
+            fi
+            
+            # Check WooCommerce uploads permissions
+            if [[ -d "$WOO_DIR" ]]; then
+                check_file_perms "$WOO_DIR" "www-data:www-data" "755" "WooCommerce uploads directory"
+            fi
+        fi
+    else
+        warning "WooCommerce: Not installed"
+    fi
+    echo
+}
+
+# =============================================================================
+# WEB CONNECTIVITY AND PERFORMANCE TESTS
+# =============================================================================
+
+check_web_connectivity() {
+    echo -e "${CYAN}=== WEB CONNECTIVITY ===${NC}"
+    
+    if command -v curl >/dev/null 2>&1; then
+        if [[ -f "/root/wordpress-credentials.txt" ]]; then
+            source /root/wordpress-credentials.txt 2>/dev/null || true
+            if [[ -n "${DOMAIN_NAME:-}" ]]; then
+                ((TOTAL_CHECKS++))
+                if curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN_NAME" | grep -q "200\|301\|302"; then
+                    success "Website accessibility: HTTPS response received"
+                else
+                    warning "Website accessibility: No valid HTTPS response"
+                fi
+            fi
+        fi
+        
+        # Local connectivity tests
+        ((TOTAL_CHECKS++))
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost" | grep -q "200\|301\|302"; then
+            success "Local HTTP: Responsive"
+        else
+            warning "Local HTTP: Not responding"
+        fi
+    fi
+    
+    # Nginx connections and performance
+    if command -v ss >/dev/null 2>&1; then
+        NGINX_CONNECTIONS=$(ss -tuln | grep -E ":80 |:443 " | wc -l)
+        echo "Nginx listening ports: $NGINX_CONNECTIONS"
+        
+        ACTIVE_CONNECTIONS=$(ss -tu | grep -E ":80|:443" | wc -l)
+        echo "Active HTTP(S) connections: $ACTIVE_CONNECTIONS"
+    fi
+    echo
+}
+
+# =============================================================================
+# MAIN EXECUTION FLOW
+# =============================================================================
+
+main() {
+    log "Starting comprehensive server monitoring and configuration comparison..."
+    log "Config base directory: $CONFIG_BASE_DIR"
+    log_entry "Comprehensive monitoring started"
+    
+    # Validate environment
+    if [[ ! -d "$CONFIG_BASE_DIR" ]]; then
+        error "Config directory not found: $CONFIG_BASE_DIR"
+        exit 1
+    fi
+    
+    # System resource monitoring
+    check_system_resources
+    
+    # Service health checks
+    check_service_health
+    
+    # Security monitoring
+    check_security_status
+    
+    # SSL certificate monitoring
+    check_ssl_certificates
+    
+    # Configuration comparisons
+    info "=== CONFIGURATION VALIDATION ==="
+    
+    # NGINX configuration validation
+    compare_template "$CONFIG_BASE_DIR/nginx/nginx.conf.template" "/etc/nginx/nginx.conf" "Nginx main config"
+    compare_template "$CONFIG_BASE_DIR/nginx/nginx-wordpress.template" "/etc/nginx/sites-available/default" "Nginx WordPress site config"
+    
+    # Check nginx config syntax
+    ((TOTAL_CHECKS++))
+    if nginx -t >/dev/null 2>&1; then
+        success "Nginx configuration syntax: VALID"
+    else
+        error "Nginx configuration syntax: INVALID"
+        nginx -t 2>&1 | head -3
+    fi
+    
+    # PHP configuration validation
+    compare_template "$CONFIG_BASE_DIR/php/8.3/fpm/php.ini.template" "/etc/php/8.3/fpm/php.ini" "PHP configuration"
+    compare_template "$CONFIG_BASE_DIR/php/8.3/fpm/pool.d/www.conf.template" "/etc/php/8.3/fpm/pool.d/www.conf" "PHP-FPM pool config"
+    
+    # MariaDB configuration validation
+    for config_file in "$CONFIG_BASE_DIR"/mariadb/conf.d/*.cnf; do
+        if [[ -f "$config_file" ]]; then
+            filename=$(basename "$config_file")
+            compare_config "$config_file" "/etc/mysql/mariadb.conf.d/$filename" "MariaDB $filename"
+        fi
+    done
+    
+    if [[ -f "$CONFIG_BASE_DIR/mariadb-conf/debian.cnf" ]]; then
+        compare_config "$CONFIG_BASE_DIR/mariadb-conf/debian.cnf" "/etc/mysql/debian.cnf" "MariaDB debian config"
+        check_file_perms "/etc/mysql/debian.cnf" "root:root" "600" "MariaDB debian.cnf permissions"
+    fi
+    
+    # Fail2ban configuration validation
+    if [[ -f "$CONFIG_BASE_DIR/fail2ban/jail.local" ]]; then
+        compare_config "$CONFIG_BASE_DIR/fail2ban/jail.local" "/etc/fail2ban/jail.local" "Fail2ban jail config"
+    fi
+    
+    if [[ -f "$CONFIG_BASE_DIR/fail2ban/sshd.local" ]]; then
+        compare_config "$CONFIG_BASE_DIR/fail2ban/sshd.local" "/etc/fail2ban/jail.d/sshd.local" "Fail2ban SSH jail"
+    fi
+    
+    # WordPress and application monitoring
+    check_wordpress_status
+    check_wordpress_database
+    check_upload_status
+    check_woocommerce_status
+    
+    # Web connectivity tests
+    check_web_connectivity
+    
+    # Theme installation check
+    THEME_DIR="$(dirname "$SCRIPT_DIR")/themes/bandfront"
+    ((TOTAL_CHECKS++))
+    if [[ -d "$THEME_DIR" ]]; then
+        if [[ -d "/var/www/html/wp-content/themes/bandfront" ]]; then
+            success "Bandfront theme: INSTALLED"
+            check_file_perms "/var/www/html/wp-content/themes/bandfront" "www-data:www-data" "755" "Theme directory permissions"
+        else
+            error "Bandfront theme: NOT INSTALLED in WordPress"
+        fi
+    else
+        warning "Bandfront theme source: NOT FOUND (submodule not initialized?)"
+    fi
+    
+    # Generate comprehensive summary
+    echo
+    echo "==============================================="
+    echo -e "${BLUE}COMPREHENSIVE MONITORING SUMMARY${NC}"
+    echo "==============================================="
+    echo -e "Total checks performed: ${BLUE}$TOTAL_CHECKS${NC}"
+    echo -e "Passed: ${GREEN}$PASSED_CHECKS${NC}"
+    echo -e "Warnings: ${YELLOW}$WARNING_CHECKS${NC}"
+    echo -e "Failures: ${RED}$FAILED_CHECKS${NC}"
+    echo
+    
+    # Calculate success rate
+    if [[ $TOTAL_CHECKS -gt 0 ]]; then
+        SUCCESS_RATE=$(( (PASSED_CHECKS * 100) / TOTAL_CHECKS ))
+        if [[ $SUCCESS_RATE -ge 90 ]]; then
+            echo -e "Overall status: ${GREEN}EXCELLENT${NC} (${SUCCESS_RATE}%)"
+        elif [[ $SUCCESS_RATE -ge 75 ]]; then
+            echo -e "Overall status: ${YELLOW}GOOD${NC} (${SUCCESS_RATE}%)"
+        elif [[ $SUCCESS_RATE -ge 50 ]]; then
+            echo -e "Overall status: ${YELLOW}NEEDS ATTENTION${NC} (${SUCCESS_RATE}%)"
+        else
+            echo -e "Overall status: ${RED}CRITICAL ISSUES${NC} (${SUCCESS_RATE}%)"
+        fi
+    fi
+    
+    echo "==============================================="
+    log_entry "Comprehensive monitoring completed"
+    
+    # Set exit code based on results
+    if [[ $FAILED_CHECKS -gt 0 ]]; then
+        error "Monitoring completed with failures"
+        exit 1
+    elif [[ $WARNING_CHECKS -gt 0 ]]; then
+        warning "Monitoring completed with warnings"
+        exit 2
+    else
+        success "Monitoring completed successfully"
+        exit 0
+    fi
+}
+
+# Run main function
+main "$@"
