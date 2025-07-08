@@ -71,7 +71,7 @@ echo "Removing default plugins..."
 echo "================================="
 
 # Remove the two bundled plugins
-wp plugin uninstall akismet hello --quiet   # same as: wp plugin delete …
+sudo -u www-data wp --path=/var/www/html plugin uninstall akismet hello --quiet
 
 echo "Starting plugin installation..."
 echo "================================="

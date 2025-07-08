@@ -47,6 +47,16 @@ apt install -y nginx certbot python3-certbot-nginx mariadb-server php8.3-fpm php
 # install optional software
 apt install -y sshfs
 
+# Move the MariaDB config section to BEFORE the first start
+# Apply MariaDB configuration template BEFORE starting
+echo "Applying MariaDB configuration template..."
+cp "$SCRIPT_DIR/configs/mariadb/conf.d/"* /etc/mysql/mariadb.conf.d/
+
+# Fix debian-start script access BEFORE starting  
+echo "Configuring MariaDB debian-start script..."
+cp "$SCRIPT_DIR/configs/mariadb-conf/debian.cnf" /etc/mysql/debian.cnf
+chmod 600 /etc/mysql/debian.cnf
+
 # Start and enable services
 systemctl enable nginx mariadb php8.3-fpm
 systemctl start nginx mariadb php8.3-fpm
@@ -65,10 +75,6 @@ mysql -u root -p"$MYSQL_ROOT_PASS" -e "DELETE FROM mysql.user WHERE User='';"
 mysql -u root -p"$MYSQL_ROOT_PASS" -e "DROP DATABASE IF EXISTS test;"
 mysql -u root -p"$MYSQL_ROOT_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
 mysql -u root -p"$MYSQL_ROOT_PASS" -e "FLUSH PRIVILEGES;"
-
-# Lockdown MariaDB (MySQL) - No Remote Access
-echo "Configuring MariaDB to allow only local connections..."
-sed -i 's/^bind-address.*/bind-address = 127.0.0.1/' /etc/mysql/mariadb.conf.d/50-server.cnf
 
 # Create WordPress database and user
 mysql -u root -p"$MYSQL_ROOT_PASS" -e "CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
@@ -201,16 +207,6 @@ echo "Activating bandfront theme..."
 sudo -u www-data wp --path=/var/www/html theme activate "bandfront"
 
 echo "Bandfront theme installation complete!"
-
-# Apply MariaDB configuration template
-echo "Applying MariaDB configuration template..."
-cp "$SCRIPT_DIR/configs/mariadb/conf.d/*" /etc/mysql/mariadb.conf.d/
-# Fix debian-start script access - waiting for upstream fix
-echo "Configuring MariaDB debian-start script..."
-cp "$SCRIPT_DIR/configs/mariadb-conf/debian.cnf" /etc/mysql/debian.cnf
-sudo chmod 600 /etc/mysql/debian.cnf
-
-systemctl restart mariadb
 
 # Save credentials
 cat > /root/wordpress-credentials.txt << EOF
