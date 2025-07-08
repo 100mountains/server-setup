@@ -541,9 +541,9 @@ check_upload_status() {
             
             # Use curl to check actual PHP-FPM values
             echo -e "\nActual PHP-FPM runtime values:"
-            if curl -s "http://localhost/phpinfo_test.php" 2>/dev/null | grep -A1 -E "(upload_max_filesize|post_max_size|max_execution_time|memory_limit|max_file_uploads)" | grep -E "<td|<th" | sed 's/<[^>]*>//g' | paste - - | while read name value; do
+            curl -s "http://localhost/phpinfo_test.php" 2>/dev/null | grep -A1 -E "(upload_max_filesize|post_max_size|max_execution_time|memory_limit|max_file_uploads)" | grep -E "<td|<th" | sed 's/<[^>]*>//g' | paste - - | while read name value; do
                 echo "  $name $value"
-            done
+            done || true
             
             # Clean up test file
             rm -f /var/www/html/phpinfo_test.php 2>/dev/null
