@@ -97,6 +97,12 @@ install_plugin "List Category Posts" "list-category-posts"
 # Install MailPoet (email marketing)
 install_plugin "MailPoet" "mailpoet"
 
+# Install Bandfront Player plugin
+echo "Installing Bandfront Player plugin..."
+sudo -u www-data wp --path=/var/www/html plugin install \
+  https://github.com/100mountains/bandfront-player/archive/refs/heads/main.zip \
+  --activate
+
 echo "================================="
 echo "Configuring plugins..."
 echo "================================="
@@ -136,20 +142,6 @@ echo "Configuring WP Armour Anti-Spam..."
 sudo -u www-data wp --path=/var/www/html option update wp_armour_enable "1"
 sudo -u www-data wp --path=/var/www/html option update wp_armour_honeypot_enable "1"
 
-# Install Bandfront Player plugin
-echo "Installing Bandfront Player plugin..."
-sudo -u www-data wp --path=/var/www/html plugin install \
-  https://github.com/100mountains/bandfront-player/archive/refs/heads/main.zip \
-  --activate
-
-# Create necessary directories
-echo "Creating necessary directories..."
-
-# Create uploads directory for digital products
-mkdir -p /var/www/html/wp-content/uploads/woocommerce_uploads
-chown -R www-data:www-data /var/www/html/wp-content/uploads/woocommerce_uploads
-chmod -R 755 /var/www/html/wp-content/uploads/woocommerce_uploads
-
 # Set proper permissions for all plugins
 echo "Setting proper permissions..."
 chown -R www-data:www-data /var/www/html/wp-content/plugins/
@@ -166,9 +158,7 @@ echo "- Theme My Login (Custom login experience)"
 echo "- WP Armour - Honeypot Anti Spam (Security)"
 echo "- List Category Posts (Content organization)"
 echo "- MailPoet (Email marketing)"
-echo ""
-echo "Created Directories:"
-echo "- /var/www/html/wp-content/uploads/woocommerce_uploads"
+echo "- Bandfront Player (Music player)"
 echo ""
 echo "Next Steps:"
 echo "1. Visit https://$DOMAIN_NAME/wp-admin to complete WordPress setup"
