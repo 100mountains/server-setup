@@ -331,24 +331,21 @@ check_security_status() {
         if [[ $RECENT_BANS -gt 0 ]]; then
             success "Fail2ban active: $RECENT_BANS IPs banned today (protection working)"
             echo -e "${BLUE}Recent bans:${NC}"
-            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | tail -3 | sed 's/^/  /' || true
+            # Only show actual ban notices, not email errors
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "NOTICE.*Ban" | tail -3 | sed 's/^/  /' || true
         else
             info "No IPs banned today (normal for new installations)"
         fi
         
-        # Check for fail2ban errors (excluding sendmail warnings)
-        FAIL2BAN_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v "sendmail" | wc -l || echo "0")
+        # Check for fail2ban errors (excluding all email-related messages)
+        FAIL2BAN_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|Command not found|INFO.*HINT" | wc -l || echo "0")
         if [[ $FAIL2BAN_ERRORS -gt 0 ]]; then
             warning "Fail2ban errors detected: $FAIL2BAN_ERRORS"
             echo -e "${YELLOW}Recent errors:${NC}"
-            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v "sendmail" | tail -2 | sed 's/^/  /' || true
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|Command not found|INFO.*HINT" | tail -2 | sed 's/^/  /' || true
         fi
         
-        # Check specifically for sendmail issues (common on fresh installs)
-        SENDMAIL_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -i "sendmail" | grep -E "ERROR|WARNING|not found" | wc -l || echo "0")
-        if [[ $SENDMAIL_ERRORS -gt 0 ]]; then
-            info "Sendmail not configured (${SENDMAIL_ERRORS} notices) - email notifications disabled"
-        fi
+        # Don't even report on email configuration - we don't use it
     else
         error "Fail2ban: NOT RUNNING"
     fi
@@ -511,21 +508,55 @@ check_wordpress_database() {
 check_upload_status() {
     echo -e "${CYAN}=== UPLOAD DIAGNOSTICS ===${NC}"
     
-    # PHP upload settings
-    echo -e "${BLUE}PHP Upload Limits:${NC}"
-    php -r "
-    echo 'upload_max_filesize: ' . ini_get('upload_max_filesize') . PHP_EOL;
-    echo 'post_max_size: ' . ini_get('post_max_size') . PHP_EOL;
-    echo 'max_execution_time: ' . ini_get('max_execution_time') . 's' . PHP_EOL;
-    echo 'memory_limit: ' . ini_get('memory_limit') . PHP_EOL;
-    echo 'max_file_uploads: ' . ini_get('max_file_uploads') . PHP_EOL;
-    " 2>/dev/null || echo "Failed to retrieve PHP settings"
+    # PHP upload settings - check PHP-FPM config, not CLI
+    echo -e "${BLUE}PHP Upload Limits (PHP-FPM):${NC}"
+    
+    # Check the actual PHP-FPM pool configuration
+    if [[ -f "/etc/php/8.3/fpm/pool.d/www.conf" ]]; then
+        echo "From PHP-FPM pool config:"
+        grep -E "php_admin_value\[(upload_max_filesize|post_max_size|max_execution_time|memory_limit|max_file_uploads)\]" /etc/php/8.3/fpm/pool.d/www.conf 2>/dev/null | sed 's/php_admin_value\[/  /' | sed 's/\]//' | sed 's/ = /: /' || true
+        
+        # Also check PHP-FPM php.ini
+        echo -e "\nFrom PHP-FPM php.ini:"
+        if [[ -f "/etc/php/8.3/fpm/php.ini" ]]; then
+            for setting in "upload_max_filesize" "post_max_size" "max_execution_time" "memory_limit" "max_file_uploads"; do
+                value=$(grep "^${setting} = " /etc/php/8.3/fpm/php.ini 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "not set")
+                echo "  ${setting}: ${value}"
+            done
+        fi
+        
+        # Compare with expected values
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        EXPECTED_UPLOAD_SIZE=$(grep "upload_max_filesize" /etc/php/8.3/fpm/pool.d/www.conf 2>/dev/null | grep -o "[0-9]*[GM]" || echo "")
+        if [[ "$EXPECTED_UPLOAD_SIZE" == "2G" ]]; then
+            success "PHP-FPM upload_max_filesize: Correctly set to 2G"
+        else
+            error "PHP-FPM upload_max_filesize: Not set to 2G (found: ${EXPECTED_UPLOAD_SIZE:-not set})"
+        fi
+        
+        # Create a test PHP file to check actual runtime values
+        if [[ -d "/var/www/html" ]]; then
+            echo '<?php phpinfo(); ?>' > /var/www/html/phpinfo_test.php
+            chown www-data:www-data /var/www/html/phpinfo_test.php
+            
+            # Use curl to check actual PHP-FPM values
+            echo -e "\nActual PHP-FPM runtime values:"
+            if curl -s "http://localhost/phpinfo_test.php" 2>/dev/null | grep -A1 -E "(upload_max_filesize|post_max_size|max_execution_time|memory_limit|max_file_uploads)" | grep -E "<td|<th" | sed 's/<[^>]*>//g' | paste - - | while read name value; do
+                echo "  $name $value"
+            done
+            
+            # Clean up test file
+            rm -f /var/www/html/phpinfo_test.php 2>/dev/null
+        fi
+    else
+        error "PHP-FPM pool config not found at /etc/php/8.3/fpm/pool.d/www.conf"
+    fi
     
     if [[ -d "$UPLOAD_DIR" ]]; then
         # Upload directory permissions
         UPLOAD_PERMS=$(stat -c "%a" "$UPLOAD_DIR" 2>/dev/null || echo "N/A")
         UPLOAD_OWNER=$(stat -c "%U:%G" "$UPLOAD_DIR" 2>/dev/null || echo "N/A")
-        echo "Upload dir permissions: $UPLOAD_PERMS ($UPLOAD_OWNER)"
+        echo -e "\nUpload dir permissions: $UPLOAD_PERMS ($UPLOAD_OWNER)"
         
         # Disk space and sizes
         UPLOAD_SIZE=$(du -sh "$UPLOAD_DIR" 2>/dev/null | cut -f1 || echo "N/A")
