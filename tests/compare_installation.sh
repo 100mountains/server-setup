@@ -3,7 +3,7 @@
 # Comprehensive Server Installation Comparison and Monitoring Script
 # Validates configurations, monitors system health, and checks WordPress functionality
 
-set -euo pipefail
+set -uo pipefail  # Removed 'e' to allow script to continue on errors
 
 # =============================================================================
 # CONFIGURATION AND GLOBALS
@@ -53,19 +53,19 @@ log() {
 error() {
     echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1"
     log_entry "ERROR: $1"
-    ((FAILED_CHECKS++))
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
 }
 
 warning() {
     echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING:${NC} $1"
     log_entry "WARNING: $1"
-    ((WARNING_CHECKS++))
+    WARNING_CHECKS=$((WARNING_CHECKS + 1))
 }
 
 success() {
     echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS:${NC} $1"
     log_entry "SUCCESS: $1"
-    ((PASSED_CHECKS++))
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
 }
 
 info() {
@@ -100,7 +100,7 @@ compare_config() {
     local actual_file="$2"
     local description="$3"
     
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     echo "=== $description ==="
     
     if [[ ! -f "$expected_file" ]]; then
@@ -130,7 +130,7 @@ compare_template() {
     local actual_file="$2"
     local description="$3"
     
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     echo "=== $description (Template Check) ==="
     
     if [[ ! -f "$template_file" ]]; then
@@ -161,7 +161,7 @@ check_file_perms() {
     local expected_perms="$3"
     local description="$4"
     
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     
     if [[ ! -f "$file_path" && ! -d "$file_path" ]]; then
         error "$description: File/directory not found: $file_path"
@@ -236,7 +236,7 @@ test_service_functionality() {
     local test_command="$2"
     local description="$3"
     
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     
     if systemctl is-active --quiet "$service_name"; then
         if eval "$test_command" >/dev/null 2>&1; then
@@ -256,7 +256,7 @@ check_service_health() {
     services=("nginx" "mariadb" "php8.3-fpm" "fail2ban")
     
     for service in "${services[@]}"; do
-        ((TOTAL_CHECKS++))
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             case $service in
                 "nginx")
@@ -305,7 +305,7 @@ check_security_status() {
     echo -e "${CYAN}=== SECURITY STATUS ===${NC}"
     
     # Fail2ban status and recent bans
-    if systemctl is-active --quiet fail2ban; then
+    if systemctl is-active --quiet fail2ban 2>/dev/null; then
         echo -e "${BLUE}Fail2ban Status:${NC}"
         fail2ban-client status 2>/dev/null | head -5 || true
         
@@ -328,14 +328,14 @@ check_security_status() {
     fi
     
     # UFW firewall status
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if command -v ufw >/dev/null 2>&1; then
-        if ufw status | grep -q "Status: active"; then
+        if ufw status 2>/dev/null | grep -q "Status: active"; then
             success "UFW: ACTIVE"
             
             # Check for required ports
-            ((TOTAL_CHECKS++))
-            if ufw status numbered | grep -E "(22|80|443)" >/dev/null; then
+            TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+            if ufw status numbered 2>/dev/null | grep -E "(22|80|443)" >/dev/null; then
                 success "UFW: Standard ports configured"
             else
                 warning "UFW: Standard ports (22,80,443) not found in rules"
@@ -356,15 +356,15 @@ check_security_status() {
 check_ssl_certificates() {
     echo -e "${CYAN}=== SSL CERTIFICATES ===${NC}"
     
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [[ -d "/etc/letsencrypt/live" ]]; then
-        CERT_COUNT=$(find /etc/letsencrypt/live -name "cert.pem" | wc -l)
+        CERT_COUNT=$(find /etc/letsencrypt/live -name "cert.pem" 2>/dev/null | wc -l || echo "0")
         if [[ $CERT_COUNT -gt 0 ]]; then
             success "SSL certificates: $CERT_COUNT found"
             
             for cert_dir in /etc/letsencrypt/live/*/; do
                 if [[ -d "$cert_dir" && -f "$cert_dir/cert.pem" ]]; then
-                    ((TOTAL_CHECKS++))
+                    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
                     domain=$(basename "$cert_dir")
                     
                     if openssl x509 -in "$cert_dir/cert.pem" -noout -checkend 2592000 >/dev/null 2>&1; then
@@ -397,7 +397,7 @@ check_wordpress_status() {
     echo -e "${CYAN}=== WORDPRESS STATUS ===${NC}"
     
     # WordPress configuration test
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [[ -f "$WP_CONFIG" ]]; then
         if php -f "$WP_CONFIG" >/dev/null 2>&1; then
             success "WordPress configuration: Syntax valid"
@@ -561,8 +561,8 @@ check_web_connectivity() {
         if [[ -f "/root/wordpress-credentials.txt" ]]; then
             source /root/wordpress-credentials.txt 2>/dev/null || true
             if [[ -n "${DOMAIN_NAME:-}" ]]; then
-                ((TOTAL_CHECKS++))
-                if curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN_NAME" | grep -q "200\|301\|302"; then
+                TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+                if curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN_NAME" 2>/dev/null | grep -q "200\|301\|302"; then
                     success "Website accessibility: HTTPS response received"
                 else
                     warning "Website accessibility: No valid HTTPS response"
@@ -571,8 +571,8 @@ check_web_connectivity() {
         fi
         
         # Local connectivity tests
-        ((TOTAL_CHECKS++))
-        if curl -s -o /dev/null -w "%{http_code}" "http://localhost" | grep -q "200\|301\|302"; then
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost" 2>/dev/null | grep -q "200\|301\|302"; then
             success "Local HTTP: Responsive"
         else
             warning "Local HTTP: Not responding"
@@ -595,6 +595,17 @@ check_web_connectivity() {
 # =============================================================================
 
 main() {
+    # Check if running as root
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}ERROR: This script must be run as root (use sudo)${NC}"
+        echo "Many operations require root privileges:"
+        echo "  - Reading system logs"
+        echo "  - Checking service status"
+        echo "  - Accessing SSL certificates"
+        echo "  - Testing server configurations"
+        exit 1
+    fi
+    
     log "Starting comprehensive server monitoring and configuration comparison..."
     log "Config base directory: $CONFIG_BASE_DIR"
     log_entry "Comprehensive monitoring started"
@@ -625,7 +636,7 @@ main() {
     compare_template "$CONFIG_BASE_DIR/nginx/nginx-wordpress.template" "/etc/nginx/sites-available/default" "Nginx WordPress site config"
     
     # Check nginx config syntax
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if nginx -t >/dev/null 2>&1; then
         success "Nginx configuration syntax: VALID"
     else
@@ -670,7 +681,7 @@ main() {
     
     # Theme installation check
     THEME_DIR="$(dirname "$SCRIPT_DIR")/themes/bandfront"
-    ((TOTAL_CHECKS++))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [[ -d "$THEME_DIR" ]]; then
         if [[ -d "/var/www/html/wp-content/themes/bandfront" ]]; then
             success "Bandfront theme: INSTALLED"
