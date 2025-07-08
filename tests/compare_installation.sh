@@ -260,15 +260,23 @@ check_service_health() {
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             case $service in
                 "nginx")
-                    if curl -s -o /dev/null -w "%{http_code}" "http://localhost" | grep -q "200\|301\|302"; then
+                    # Check both HTTP and HTTPS, accepting redirects as valid responses
+                    if curl -s -o /dev/null -w "%{http_code}" "http://localhost" 2>/dev/null | grep -q "200\|301\|302\|303\|307\|308"; then
                         success "$service: Running and responsive"
+                    elif curl -s -o /dev/null -w "%{http_code}" "https://localhost" -k 2>/dev/null | grep -q "200\|301\|302"; then
+                        success "$service: Running and responsive (HTTPS only)"
                     else
-                        warning "$service: Running but not responding to HTTP requests"
+                        warning "$service: Running but not responding to HTTP/HTTPS requests"
                     fi
                     ;;
                 "mariadb")
-                    if mysql -e "SELECT 1;" >/dev/null 2>&1; then
+                    # Try multiple connection methods
+                    if mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
                         success "$service: Running and responsive"
+                    elif mysql -e "SELECT 1;" >/dev/null 2>&1; then
+                        success "$service: Running and responsive"
+                    elif sudo mysql -e "SELECT 1;" >/dev/null 2>&1; then
+                        success "$service: Running and responsive (requires sudo)"
                     else
                         warning "$service: Running but not accepting connections"
                     fi
@@ -291,7 +299,16 @@ check_service_health() {
                     ;;
             esac
         else
-            error "$service: NOT RUNNING"
+            # Check for alternative service names
+            if [[ "$service" == "mariadb" ]] && systemctl is-active --quiet "mysql" 2>/dev/null; then
+                warning "$service: Service is running as 'mysql'"
+                # Still try to connect
+                if mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
+                    success "mysql: Running and responsive"
+                fi
+            else
+                error "$service: NOT RUNNING"
+            fi
         fi
     done
     echo
@@ -309,22 +326,47 @@ check_security_status() {
         echo -e "${BLUE}Fail2ban Status:${NC}"
         fail2ban-client status 2>/dev/null | head -5 || true
         
-        # Recent bans
+        # Recent bans - this is fail2ban working correctly
         RECENT_BANS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | wc -l || echo "0")
         if [[ $RECENT_BANS -gt 0 ]]; then
-            warning "Recent bans today: $RECENT_BANS"
-            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | tail -3 || true
+            success "Fail2ban active: $RECENT_BANS IPs banned today (protection working)"
+            echo -e "${BLUE}Recent bans:${NC}"
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | tail -3 | sed 's/^/  /' || true
         else
-            success "No bans today"
+            info "No IPs banned today (normal for new installations)"
         fi
+        
+        # Check for fail2ban errors (excluding sendmail warnings)
+        FAIL2BAN_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v "sendmail" | wc -l || echo "0")
+        if [[ $FAIL2BAN_ERRORS -gt 0 ]]; then
+            warning "Fail2ban errors detected: $FAIL2BAN_ERRORS"
+            echo -e "${YELLOW}Recent errors:${NC}"
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v "sendmail" | tail -2 | sed 's/^/  /' || true
+        fi
+        
+        # Check specifically for sendmail issues (common on fresh installs)
+        SENDMAIL_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -i "sendmail" | grep -E "ERROR|WARNING|not found" | wc -l || echo "0")
+        if [[ $SENDMAIL_ERRORS -gt 0 ]]; then
+            info "Sendmail not configured (${SENDMAIL_ERRORS} notices) - email notifications disabled"
+        fi
+    else
+        error "Fail2ban: NOT RUNNING"
     fi
     
-    # SSH login attempts
-    FAILED_SSH=$(grep "$(date '+%b %e')" /var/log/auth.log 2>/dev/null | grep -i "failed\|invalid" | wc -l || echo "0")
+    # SSH login attempts - fix the multiline issue
+    FAILED_SSH=$(grep "$(date '+%b %e')" /var/log/auth.log 2>/dev/null | grep -i -E "failed|invalid" | wc -l || echo "0")
+    # Remove any whitespace/newlines from the count
+    FAILED_SSH=$(echo "$FAILED_SSH" | tr -d '\n' | tr -d ' ')
+    
+    echo "Failed SSH attempts today: $FAILED_SSH"
     if [[ $FAILED_SSH -gt 10 ]]; then
-        warning "High failed SSH attempts today: $FAILED_SSH"
-    else
-        echo "Failed SSH attempts today: $FAILED_SSH"
+        if [[ $RECENT_BANS -gt 0 ]]; then
+            success "High SSH attempts ($FAILED_SSH) but fail2ban is blocking them"
+        else
+            warning "High failed SSH attempts today: $FAILED_SSH (consider checking fail2ban)"
+        fi
+    elif [[ $FAILED_SSH -eq 0 ]]; then
+        info "No failed SSH attempts (typical for new servers)"
     fi
     
     # UFW firewall status
@@ -570,12 +612,17 @@ check_web_connectivity() {
             fi
         fi
         
-        # Local connectivity tests
+        # Local connectivity tests - check both HTTP and HTTPS
         TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-        if curl -s -o /dev/null -w "%{http_code}" "http://localhost" 2>/dev/null | grep -q "200\|301\|302"; then
-            success "Local HTTP: Responsive"
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost" 2>/dev/null || echo "000")
+        HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://localhost" -k 2>/dev/null || echo "000")
+        
+        if [[ "$HTTP_CODE" =~ ^(200|301|302|303|307|308)$ ]]; then
+            success "Local HTTP: Responsive (${HTTP_CODE})"
+        elif [[ "$HTTPS_CODE" =~ ^(200|301|302)$ ]]; then
+            success "Local HTTPS: Responsive (${HTTPS_CODE})"
         else
-            warning "Local HTTP: Not responding"
+            warning "Local HTTP/HTTPS: Not responding (HTTP: ${HTTP_CODE}, HTTPS: ${HTTPS_CODE})"
         fi
     fi
     
