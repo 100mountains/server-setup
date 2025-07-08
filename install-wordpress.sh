@@ -204,7 +204,12 @@ echo "Bandfront theme installation complete!"
 
 # Apply MariaDB configuration template
 echo "Applying MariaDB configuration template..."
-cp "$SCRIPT_DIR/configs/mariadb/conf.d/60-optimizations.cnf" /etc/mysql/mariadb.conf.d/
+cp "$SCRIPT_DIR/configs/mariadb/conf.d/*" /etc/mysql/mariadb.conf.d/
+# Fix debian-start script access - waiting for upstream fix
+echo "Configuring MariaDB debian-start script..."
+cp "$SCRIPT_DIR/configs/mariadb-conf/debian.cnf" /etc/mysql/debian.cnf
+sudo chmod 600 /etc/mysql/debian.cnf
+
 systemctl restart mariadb
 
 # Save credentials
@@ -241,18 +246,3 @@ echo ""
 echo "Theme: Bandfront child theme activated"
 echo ""
 
-# Fix debian-start script access
-echo "Configuring MariaDB debian-start script..."
-cat > /etc/mysql/debian.cnf << EOF
-[client]
-host     = localhost
-user     = root
-password = $MYSQL_ROOT_PASS
-socket   = /run/mysqld/mysqld.sock
-[mysql_upgrade]
-host     = localhost
-user     = root
-password = $MYSQL_ROOT_PASS
-socket   = /run/mysqld/mysqld.sock
-EOF
-chmod 600 /etc/mysql/debian.cnf

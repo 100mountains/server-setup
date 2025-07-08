@@ -46,3 +46,178 @@
         systemctl reload fail2ban > /dev/null 2>&1 || true
     endscript
 }
+
+# Apt Logs
+/var/log/apt/history.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/apt/term.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+# DPKG Logs
+/var/log/dpkg.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+# Unattended Upgrades Logs
+/var/log/unattended-upgrades/unattended-upgrades.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/unattended-upgrades/unattended-upgrades-dpkg.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/unattended-upgrades/unattended-upgrades-shutdown.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+# PHP Logs
+/var/log/php8.3-fpm.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload php8.3-fpm > /dev/null 2>&1 || true
+    endscript
+}
+
+# Nginx Logs
+/var/log/nginx/access.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload nginx > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/nginx/error.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload nginx > /dev/null 2>&1 || true
+    endscript
+}
+
+# UFW Logs
+/var/log/ufw.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+# Miscellaneous Logs
+/var/log/alternatives.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/apport.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/system-monitor.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/fontconfig.log {
+    rotate 7
+    daily
+    compress
+    missingok
+    notifempty
+    create 640 root adm
+    postrotate
+        systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}

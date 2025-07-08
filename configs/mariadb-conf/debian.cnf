@@ -1,0 +1,9 @@
+# THIS FILE IS OBSOLETE. STOP USING IT IF POSSIBLE.
+
+[client]
+user   = root
+socket = /var/run/mysqld/mysqld.sock
+
+[mysql_upgrade]
+user   = root
+socket = /var/run/mysqld/mysqld.sock

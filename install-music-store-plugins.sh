@@ -67,6 +67,12 @@ install_plugin() {
 # Check WP-CLI availability
 check_wp_cli
 
+echo "Removing default plugins..."
+echo "================================="
+
+# Remove the two bundled plugins
+wp plugin uninstall akismet hello --quiet   # same as: wp plugin delete …
+
 echo "Starting plugin installation..."
 echo "================================="
 
