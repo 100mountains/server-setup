@@ -83,10 +83,11 @@ alert() {
 
 get_wp_db_creds() {
     if [[ -f "$WP_CONFIG" ]]; then
-        DB_NAME=$(grep "DB_NAME" "$WP_CONFIG" | cut -d "'" -f 4 || true)
-        DB_USER=$(grep "DB_USER" "$WP_CONFIG" | cut -d "'" -f 4 || true)
-        DB_PASS=$(grep "DB_PASSWORD" "$WP_CONFIG" | cut -d "'" -f 4 || true)
-        DB_HOST=$(grep "DB_HOST" "$WP_CONFIG" | cut -d "'" -f 4 || true)
+        # More robust parsing using awk to handle both single and double quotes
+        DB_NAME=$(awk -F"['\"]" '/define.*DB_NAME/{print $(NF-1)}' "$WP_CONFIG" 2>/dev/null || true)
+        DB_USER=$(awk -F"['\"]" '/define.*DB_USER/{print $(NF-1)}' "$WP_CONFIG" 2>/dev/null || true)
+        DB_PASS=$(awk -F"['\"]" '/define.*DB_PASSWORD/{print $(NF-1)}' "$WP_CONFIG" 2>/dev/null || true)
+        DB_HOST=$(awk -F"['\"]" '/define.*DB_HOST/{print $(NF-1)}' "$WP_CONFIG" 2>/dev/null || true)
     fi
 }
 
@@ -270,8 +271,13 @@ check_service_health() {
                     fi
                     ;;
                 "mariadb")
+                    # Try to get WordPress database credentials for testing
+                    get_wp_db_creds
+                    
                     # Try multiple connection methods
-                    if mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
+                    if [[ -n "${DB_USER:-}" && -n "${DB_PASS:-}" ]] && mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" -e "SELECT 1;" >/dev/null 2>&1; then
+                        success "$service: Running and responsive (using WP credentials)"
+                    elif mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
                         success "$service: Running and responsive"
                     elif mysql -e "SELECT 1;" >/dev/null 2>&1; then
                         success "$service: Running and responsive"
@@ -303,7 +309,10 @@ check_service_health() {
             if [[ "$service" == "mariadb" ]] && systemctl is-active --quiet "mysql" 2>/dev/null; then
                 warning "$service: Service is running as 'mysql'"
                 # Still try to connect
-                if mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
+                get_wp_db_creds
+                if [[ -n "${DB_USER:-}" && -n "${DB_PASS:-}" ]] && mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" -e "SELECT 1;" >/dev/null 2>&1; then
+                    success "mysql: Running and responsive (using WP credentials)"
+                elif mysqladmin ping -h localhost 2>/dev/null | grep -q "alive"; then
                     success "mysql: Running and responsive"
                 fi
             else
@@ -337,20 +346,18 @@ check_security_status() {
             info "No IPs banned today (normal for new installations)"
         fi
         
-        # Check for fail2ban errors (excluding all email-related messages)
-        FAIL2BAN_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|Command not found|INFO.*HINT" | wc -l || echo "0")
-        if [[ $FAIL2BAN_ERRORS -gt 0 ]]; then
-            warning "Fail2ban errors detected: $FAIL2BAN_ERRORS"
-            echo -e "${YELLOW}Recent errors:${NC}"
-            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|Command not found|INFO.*HINT" | tail -2 | sed 's/^/  /' || true
+        # Only check for real jail failures, not email notification failures
+        JAIL_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|printf|exec:|returned 127|fail2ban.actions|fail2ban.utils" | wc -l || echo "0")
+        if [[ $JAIL_ERRORS -gt 0 ]]; then
+            warning "Fail2ban jail errors detected: $JAIL_ERRORS"
+            echo -e "${YELLOW}Recent jail errors:${NC}"
+            grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|printf|exec:|returned 127|fail2ban.actions|fail2ban.utils" | tail -2 | sed 's/^/  /' || true
         fi
-        
-        # Don't even report on email configuration - we don't use it
     else
         error "Fail2ban: NOT RUNNING"
     fi
     
-    # SSH login attempts - fix the multiline issue
+    # SSH login attempts
     FAILED_SSH=$(grep "$(date '+%b %e')" /var/log/auth.log 2>/dev/null | grep -i -E "failed|invalid" | wc -l || echo "0")
     # Remove any whitespace/newlines from the count
     FAILED_SSH=$(echo "$FAILED_SSH" | tr -d '\n' | tr -d ' ')
@@ -812,5 +819,7 @@ main() {
     fi
 }
 
+# Run main function
+main "$@"
 # Run main function
 main "$@"
