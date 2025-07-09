@@ -486,6 +486,7 @@ check_wordpress_database() {
     
     get_wp_db_creds
     
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [[ -n "${DB_NAME:-}" && -n "${DB_USER:-}" && -n "${DB_PASS:-}" ]]; then
         if mysql -h"${DB_HOST:-localhost}" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT 1;" >/dev/null 2>&1; then
             success "WordPress Database: Accessible"
@@ -584,6 +585,7 @@ check_upload_status() {
         
         # Recent failed uploads (look for temp files)
         TEMP_FILES=$(find "$UPLOAD_DIR" -name "*.tmp" -mtime -1 2>/dev/null | wc -l || echo "0")
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
         if [[ $TEMP_FILES -gt 0 ]]; then
             warning "Recent temp files (failed uploads): $TEMP_FILES"
             find "$UPLOAD_DIR" -name "*.tmp" -mtime -1 2>/dev/null | head -3 || true
@@ -599,6 +601,7 @@ check_upload_status() {
 check_woocommerce_status() {
     echo -e "${CYAN}=== WOOCOMMERCE STATUS ===${NC}"
     
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if [[ -d "$WP_PATH/wp-content/plugins/woocommerce" ]]; then
         success "WooCommerce: Installed"
         
@@ -613,6 +616,7 @@ check_woocommerce_status() {
             echo "Download attempts today: $DOWNLOAD_LOGS"
             
             # WooCommerce uploads protection
+            TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
             if [[ -f "$WOO_DIR/.htaccess" ]]; then
                 success "Downloads protected"
             else
@@ -795,12 +799,17 @@ main() {
         if [[ $SUCCESS_RATE -ge 90 ]]; then
             echo -e "Overall status: ${GREEN}EXCELLENT${NC} (${SUCCESS_RATE}%)"
         elif [[ $SUCCESS_RATE -ge 75 ]]; then
-            echo -e "Overall status: ${YELLOW}GOOD${NC} (${SUCCESS_RATE}%)"
+            echo -e "Overall status: ${GREEN}GOOD${NC} (${SUCCESS_RATE}%)"
         elif [[ $SUCCESS_RATE -ge 50 ]]; then
             echo -e "Overall status: ${YELLOW}NEEDS ATTENTION${NC} (${SUCCESS_RATE}%)"
         else
             echo -e "Overall status: ${RED}CRITICAL ISSUES${NC} (${SUCCESS_RATE}%)"
         fi
+    fi
+    
+    # Sanity check for debugging
+    if [[ $PASSED_CHECKS -gt $TOTAL_CHECKS ]]; then
+        echo -e "${YELLOW}DEBUG: Counter mismatch detected (passed > total)${NC}"
     fi
     
     echo "==============================================="
