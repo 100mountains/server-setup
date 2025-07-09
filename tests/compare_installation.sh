@@ -336,7 +336,7 @@ check_security_status() {
         fail2ban-client status 2>/dev/null | head -5 || true
         
         # Recent bans - this is fail2ban working correctly
-        RECENT_BANS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | wc -l || echo "0")
+        RECENT_BANS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep "Ban " | wc -l | tr -d '\n' | tr -d ' ' || echo "0")
         if [[ $RECENT_BANS -gt 0 ]]; then
             success "Fail2ban active: $RECENT_BANS IPs banned today (protection working)"
             echo -e "${BLUE}Recent bans:${NC}"
@@ -347,7 +347,7 @@ check_security_status() {
         fi
         
         # Only check for real jail failures, not email notification failures
-        JAIL_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|printf|exec:|returned 127|fail2ban.actions|fail2ban.utils" | wc -l || echo "0")
+        JAIL_ERRORS=$(grep "$(date '+%Y-%m-%d')" /var/log/fail2ban.log 2>/dev/null | grep -E "ERROR|CRITICAL" | grep -v -E "sendmail|mail|smtp|printf|exec:|returned 127|fail2ban.actions|fail2ban.utils" | wc -l | tr -d '\n' | tr -d ' ' || echo "0")
         if [[ $JAIL_ERRORS -gt 0 ]]; then
             warning "Fail2ban jail errors detected: $JAIL_ERRORS"
             echo -e "${YELLOW}Recent jail errors:${NC}"
@@ -357,10 +357,10 @@ check_security_status() {
         error "Fail2ban: NOT RUNNING"
     fi
     
-    # SSH login attempts
-    FAILED_SSH=$(grep "$(date '+%b %e')" /var/log/auth.log 2>/dev/null | grep -i -E "failed|invalid" | wc -l || echo "0")
-    # Remove any whitespace/newlines from the count
-    FAILED_SSH=$(echo "$FAILED_SSH" | tr -d '\n' | tr -d ' ')
+    # SSH login attempts - fix date format for auth.log
+    # auth.log uses format like "Jan  9" with two spaces for single digit days
+    CURRENT_DATE=$(date '+%b %e' | sed 's/  */ /g')
+    FAILED_SSH=$(grep "$CURRENT_DATE" /var/log/auth.log 2>/dev/null | grep -i -E "Failed password|Invalid user" | wc -l | tr -d '\n' | tr -d ' ' || echo "0")
     
     echo "Failed SSH attempts today: $FAILED_SSH"
     if [[ $FAILED_SSH -gt 10 ]]; then
@@ -819,7 +819,5 @@ main() {
     fi
 }
 
-# Run main function
-main "$@"
 # Run main function
 main "$@"
